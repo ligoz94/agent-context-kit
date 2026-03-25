@@ -1,0 +1,64 @@
+# manifest.yaml
+# Source of truth for agent-context-kit.
+# This file drives both the Toolshed MCP server and the CLI.
+# Schema version: 1.0
+
+project:
+  name: "my-project"
+  description: "Short description the LLM uses to orient itself"
+  version: "0.1.0"
+  language: "typescript"          # primary language, for LLM hints
+  stack: []                       # e.g. ["react", "postgres", "redis"]
+
+# ── Layer 0: Identity ────────────────────────────────────────────────────────
+# Stable. Loaded always. Keep it compact (target < 800 tokens total).
+identity:
+  values:       docs/agent/values.md
+  architecture: docs/agent/architecture-primer.md
+  glossary:     docs/agent/glossary.md            # key terms, acronyms
+
+# ── Layer 1: Rules ───────────────────────────────────────────────────────────
+# Changes rarely. Loaded for any coding/review task.
+rules:
+  policy:       docs/agent/context-policy.md
+  standards:
+    - name: testing
+      path: docs/human/testing.md
+    - name: way-of-working
+      path: docs/human/way-of-working.md
+
+# ── Layer 2: Knowledge ───────────────────────────────────────────────────────
+# Living memory of the project. Updated as the team learns.
+# ADRs: use docs/decisions/ (see _template.md). Not loaded by Toolshed unless you
+# reference them from rules.standards, key-learnings, or architecture-primer.
+knowledge:
+  learnings:    docs/agent/key-learnings.md
+  backend:      docs/backend/                     # directory → all .md files indexed
+
+# ── Feature registry ─────────────────────────────────────────────────────────
+# Named specs the Toolshed exposes via get_spec().
+# Add a new entry for every significant feature.
+registry: []
+# Example:
+# registry:
+#   - name: auth-flow
+#     path: docs/features/auth-flow.md
+#     status: stable           # stable | wip | deprecated
+#   - name: data-loading
+#     path: docs/features/data-loading.md
+#     status: wip
+
+# ── Prompts ──────────────────────────────────────────────────────────────────
+# Named prompts the CLI or IDE can reference by key.
+prompts:
+  dir: docs/agent/prompts/
+
+# ── Toolshed server config ───────────────────────────────────────────────────
+toolshed:
+  port: 3742
+  # tool_aliases let you rename canonical tools to avoid collisions
+  # with other MCP servers in the same client.
+  tool_aliases: {}
+  # Example:
+  # tool_aliases:
+  #   get_spec: fetch_feature_brief

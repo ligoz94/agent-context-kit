@@ -1,0 +1,35 @@
+{
+  "name": "@agent-context-kit/langchain",
+  "version": "0.1.2",
+  "type": "module",
+  "description": "LangChain tools and observability integrations for agent-context-kit",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.2.0",
+    "js-yaml": "^4.1.0",
+    "langsmith": "^0.1.0",
+    "zod": "^4.0.0",
+    "@agent-context-kit/toolshed-server": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0",
+    "@types/js-yaml": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

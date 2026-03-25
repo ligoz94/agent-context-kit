@@ -1,0 +1,38 @@
+# agent-context-kit
+schema_version: "1.0"
+project:
+  name: Acme Web App
+  description: E-commerce storefront built with Next.js App Router and Tailwind CSS.
+  stack:
+    - Next.js 14 (App Router)
+    - React Server Components (RSC)
+    - Tailwind CSS + shadcn/ui
+    - PostgreSQL + Prisma
+    - Zod
+
+identity:
+  values: docs/agent/values.md
+  architecture: docs/agent/architecture-primer.md
+  glossary: docs/agent/glossary.md
+
+rules:
+  policy: docs/agent/context-policy.md
+  standards:
+    - name: react-components
+      path: docs/agent/standards/react-components.md
+    - name: database-access
+      path: docs/agent/standards/database-access.md
+
+knowledge:
+  learnings: docs/agent/key-learnings.md
+
+registry:
+  - name: user-authentication
+    path: docs/features/user-authentication.md
+    status: shipped
+  - name: product-catalog
+    path: docs/features/product-catalog.md
+    status: in-progress
+  - name: shopping-cart
+    path: docs/features/shopping-cart.md
+    status: planned

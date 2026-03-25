@@ -1,0 +1,22 @@
+{
+  "name": "langchain-agent-example",
+  "version": "1.0.0",
+  "description": "Demo of using @agent-context-kit/langchain tools with a LangChain agent",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@agent-context-kit/langchain": "file:../../packages/langchain",
+    "@langchain/core": "^0.2.0",
+    "@langchain/openai": "^0.2.0",
+    "dotenv": "^16.4.5",
+    "langchain": "^0.2.0",
+    "langsmith": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.10.0",
+    "typescript": "^5.0.0"
+  }
+}

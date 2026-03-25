@@ -1,6 +1,6 @@
 {
   "name": "@agent-context-kit/toolshed-server",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "MCP Toolshed server for agent-context-kit",
   "main": "dist/index.js",

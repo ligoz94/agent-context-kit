@@ -5,7 +5,8 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "start": "tsx index.ts"
+    "start": "tsx index.ts",
+    "openrouter": "tsx openrouter.ts"
   },
   "dependencies": {
     "@agent-context-kit/langchain": "file:../../packages/langchain",

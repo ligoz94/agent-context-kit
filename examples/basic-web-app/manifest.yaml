@@ -36,3 +36,6 @@ registry:
   - name: shopping-cart
     path: docs/features/shopping-cart.md
     status: planned
+  - name: dark-mode
+    path: docs/features/dark-mode.md
+    status: planned

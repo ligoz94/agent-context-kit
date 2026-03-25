@@ -14,12 +14,12 @@ Every AI/LLM agent starts blind when it enters your codebase. You either dump to
 
 `agent-context-kit` uses a **4-layer context structure** combined with dynamic tools to expose your project's knowledge graph to AI agents exactly when they need it. Agents fetch what they need dynamically instead of reading the whole repository.
 
-```
-L0 Identity   → who the project is       (always loaded, compact)
-L1 Rules      → how the project works    (loaded per task)
-L2 Knowledge  → what the project knows   (fetched on demand)
-L3 Context    → what the task is         (your chat input)
-```
+### 📚 The 4 Layers of Context
+
+- **L0 Identity (The Core DNA):** Always loaded and kept as compact as possible. This includes your non-negotiable project values (`values.md`), high-level repository map (`architecture-primer.md`), and domain glossary. It provides the absolute baseline understanding of *what* the project is.
+- **L1 Rules (The Standards):** Loaded per task. These are your architectural laws and best practices for specific parts of the stack (e.g., "React Components Standard" or "Database Access Policy"). Agents fetch these based on the specific subsystem they are working on.
+- **L2 Knowledge (The Deep Context):** Fetched strictly on demand. This layer contains detailed feature specifications (`docs/features/`), past architectural decisions (`docs/decisions/`), and specific pitfalls to avoid (`key-learnings.md`). It ensures agents don't hallucinate implementation details for complex app features.
+- **L3 Context (The Task at Hand):** The immediate, real-time context. This is your active chat prompt, the files you currently have open in your editor, and your local terminal output. This is managed by the user and the IDE/Client.
 
 ### ✨ Key Advantages
 - **Single Source of Truth:** Stop copying and pasting prompts. Define your rules in `manifest.yaml` and standard Markdown files.
@@ -33,9 +33,9 @@ L3 Context    → what the task is         (your chat input)
 
 ### 1. Scaffold your project
 Run the CLI in the root of your repository to generate the base structure:
-\`\`\`bash
+```bash
 npx @agent-context-kit/cli init
-\`\`\`
+```
 
 ### 2. Define your knowledge
 This creates a `manifest.yaml` and a `docs/agent/` folder. Fill in the Markdown files:
@@ -49,17 +49,17 @@ You can feed this context to AI agents in two ways:
 
 #### Option A: IDEs / MCP Clients (Cursor, Claude Desktop)
 Start the Toolshed server out of the box. It implements the standard Model Context Protocol:
-\`\`\`bash
+```bash
 npx @agent-context-kit/toolshed-server
-\`\`\`
+```
 *See `docs/human/toolshed-mcp-setup.md` inside your repo after initialization for full IDE setup instructions.*
 
 #### Option B: LangChain.js Agents
 If you are building your own custom agents in Node/TypeScript, you can import your project context directly as LangChain tools and track them via LangSmith.
-\`\`\`bash
+```bash
 npm install @agent-context-kit/langchain
-\`\`\`
-\`\`\`typescript
+```
+```typescript
 import { createContextKitTools, enableLangSmith } from "@agent-context-kit/langchain";
 
 // Enable tracing to see exactly what context the LLM is reading
@@ -69,7 +69,7 @@ enableLangSmith({ projectName: "my-agent-demo" });
 const tools = createContextKitTools("./manifest.yaml");
 
 // Pass the tools to any LangChain agent executor!
-\`\`\`
+```
 
 ---
 
@@ -125,16 +125,16 @@ Look inside the `/examples` directory of this repository to see fully fleshed ou
 
 Ensure your context repository stays healthy with the toolkit's CLI:
 
-### \`context-kit init\`
+### `context-kit init`
 Scaffolds the `manifest.yaml` and `docs/agent/` structure into your current directory. It safely skips files that already exist.
 
-### \`context-kit check\`
+### `context-kit check`
 Your project's safety net. It runs a full validation pass before the MCP server boots:
 - **Manifest Validation:** Ensures your `manifest.yaml` conforms to the Zod schema.
 - **Link Auditing:** Verifies that every file referenced in the manifest actually exists on disk.
 - **Token Budgets:** Analyzes your markdown files and warns you if they exceed the recommended token limits (see Token Budgets below), preventing you from overflowing the LLM.
 
-### \`context-kit sync\`
+### `context-kit sync`
 Updates the underlying kit instructions in your documentation files without touching your custom project data.  
 
 Since you write your project knowledge inside the same Markdown files that the LLM uses for its meta-prompt instructions, the files contain two kinds of regions:
@@ -143,7 +143,7 @@ Since you write your project knowledge inside the same Markdown files that the L
 - **Project Regions (`<!-- agent-context-kit:project:start -->`)**: This is where you write *your* actual content (your architecture, your values, your feature specs). The `sync` command will **never** overwrite or touch anything inside these blocks.
 
 Example of a tracked Markdown file:
-\`\`\`markdown
+```markdown
 <!-- agent-context-kit:engine:start -->
 # L0: Identity & Values
 > **Goal:** Align AI output with team non-negotiables. Define *how* we build things here.
@@ -153,14 +153,14 @@ Example of a tracked Markdown file:
 <!-- agent-context-kit:project:start -->
 Your custom project values go here. This text is perfectly preserved during a sync!
 <!-- agent-context-kit:project:end -->
-\`\`\`
+```
 
-### \`context-kit list\`
+### `context-kit list`
 A quick utility to list all currently active features and prompts registered in your manifest.
 
 ## Token Budget Guidelines
 
-\`context-kit check\` will warn you if your context limits exceed:
+`context-kit check` will warn you if your context limits exceed:
 
 | Layer | Target | Hard limit |
 |-------|--------|-----------|

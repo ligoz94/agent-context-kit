@@ -298,6 +298,66 @@ export function cmdCheck(cwd: string = process.cwd()): number {
   }
 }
 
+export function cmdNewSpec(name?: string, cwd: string = process.cwd()) {
+  if (!name) {
+    fail("Name is required. Usage: context-kit new-spec <name>");
+    process.exit(1);
+  }
+
+  const manifestPath = join(cwd, "manifest.yaml");
+  if (!existsSync(manifestPath)) {
+    fail("manifest.yaml not found. Are you in the project root?");
+    process.exit(1);
+  }
+
+  let templateDir: string;
+  try {
+    templateDir = findTemplateDir();
+  } catch (e) {
+    fail((e as Error).message);
+    process.exit(1);
+  }
+
+  const destDir = join(cwd, "docs", "features");
+  ensureDir(destDir);
+  const destPath = join(destDir, `${name}.md`);
+
+  if (existsSync(destPath)) {
+    fail(`Spec already exists at docs/features/${name}.md`);
+    process.exit(1);
+  }
+
+  const templatePath = join(templateDir, "docs/features/_template.md");
+  let templateContent = "";
+  try {
+    templateContent = readFileSync(templatePath, "utf8");
+    templateContent = templateContent.replace(/# \[Feature Name\]/, `# ${name}`);
+    writeFileSync(destPath, templateContent, "utf8");
+    ok(`Created spec: docs/features/${name}.md`);
+  } catch (e) {
+    fail(`Could not create spec file: ${(e as Error).message}`);
+    process.exit(1);
+  }
+
+  let raw = readFileSync(manifestPath, "utf8");
+  if (!raw.includes(`name: ${name}`)) {
+    const newEntry = `\n  - name: ${name}\n    path: docs/features/${name}.md\n    status: wip`;
+    if (raw.includes("registry: []")) {
+      raw = raw.replace("registry: []", `registry:${newEntry}`);
+    } else if (raw.includes("registry:")) {
+      raw = raw.replace("registry:", `registry:${newEntry}`);
+    } else {
+      raw += `\nregistry:${newEntry}\n`;
+    }
+    writeFileSync(manifestPath, raw, "utf8");
+    ok(`Added ${name} directly to manifest.yaml registry as 'wip'.`);
+  } else {
+    warn(`Feature ${name} is already in manifest.yaml registry.`);
+  }
+
+  log(`Done! You can now edit docs/features/${name}.md`);
+}
+
 export function cmdList(cwd: string = process.cwd()) {
   log("Available resources:\n");
 
@@ -323,10 +383,11 @@ export function cmdHelp() {
   context-kit <command>
 
   Commands:
-    init    Scaffold docs/agent/ structure in this project
-    sync    Update engine regions in existing files (preserves project regions)
-    check   Validate manifest, check required files, warn on token budget
-    list    List available prompts and features
+    init              Scaffold docs/agent/ structure in this project
+    sync              Update engine regions in existing files
+    check             Validate manifest and check required files
+    list              List available prompts and features
+    new-spec <name>   Scaffold a new feature spec and add it to the manifest registry
 
   Options:
     --help  Show this help
@@ -356,6 +417,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       break;
     case "list":
       cmdList();
+      break;
+    case "new-spec":
+      cmdNewSpec(process.argv[3]);
       break;
     default:
       cmdHelp();

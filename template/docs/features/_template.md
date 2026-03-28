@@ -1,64 +1,94 @@
-# Implementation Plan
+# Feature: <feature-name>
 
-**Status**: `needs-discovery` | `planned` | `partial` | `implemented`
+**Status:** `needs-discovery` | `planned` | `partial` | `implemented`
+**Domain:** <domain-name>
+**Specs:** [001-<decision>.md](specs/001-<decision>.md), [002-<decision>.md](specs/002-<decision>.md)
 
-**Feature doc**: [../feature.md](../feature.md)
+## 1. Objective
 
-**Domain**: Wellbore | Schematics | Cementing | Data Sources | Settings | Data Model
+<What user/business outcome this feature enables.>
 
-**Dependencies**: (other specs/features this depends on, or "none")
+## 2. Product Intent
 
-## Parsed Intent
+<Why this feature exists and what user problem it solves.>
 
-<Structured extraction>
+### User Flows
 
-## Unknowns
+**Primary Flow:**
 
-<List>
+1. <Step-by-step primary flow>
+2. <Step>
+3. <Step>
 
-## Tasks
+**Secondary Flow (optional):**
 
-<Minimal description>
+1. <Step>
+2. <Step>
+3. <Step>
 
-Note: Include less specific code, unless really important for details, and more written instructions
+**Filter/Search Flow (optional):**
 
-**`path/to/file.ts`:**
+- <Applied filters and expected table/list updates>
+- <Sort/pagination/search behavior>
 
-- [ ] `functionName(param: Type): ReturnType` — brief description
-  - Sub-detail that elaborates (not a separate task — no checkbox)
+### Visual Design Notes
 
-**`path/to/another-file.ts`:**
+- <Layout notes>
+- <Interaction notes>
+- <Feedback states>
 
-- [ ] Another task
+## 3. Technical Intent
 
-## Validation Plan
+- <Main architecture choices>
+- <Data flow and key dependencies>
+- <State management / API strategy>
+- <Default sort / grouping / mismatch rules if relevant>
+- <URL state persistence / routing behaviors if relevant>
 
-- [ ] Unit tests in `__tests__/file.test.ts`:
-  - `functionName(input)` → expected output
-  - Edge case description
-- API Integration tests?
-- Edge cases?
+### <Optional Deep-Dive Strategy>
 
-## Test Commands
+<Use this subsection for critical resolution logic or domain rules that need explicit rationale.>
 
-```sh
-# Type check
-bun tsc --noEmit --skipLibCheck <file>
+## 4. Constraints
 
-# Lint
-bun oxlint <file>
+- <Business or technical constraints>
 
-# Unit tests
-bun test <test-file>
+## 5. Non-Goals
 
-# Full suite
-moon run frontend-plug-and-abandonment:test
-```
+- <Explicitly out of scope>
 
-## Risks
+## 6. User-Facing Failure States
 
-- (optional) Note any security, data leakage, or regression concerns
+- <Error state>
+- <Empty state>
 
-## Acceptance Criteria
+## 7. Key Files
 
-Testable statements only.
+- `<path/to/main/file>` — <role>
+- `<path/to/secondary/file>` — <role>
+
+## 8. Verification
+
+- <Manual verification path>
+- <Automated tests to run>
+- <API/Integration checks if applicable>
+- <Storybook/UI checks if applicable>
+
+## 9. Data Boundaries
+
+- **Inputs:** <input contract>
+- **Outputs:** <output contract>
+- **Storage:** <local/db/cache boundaries>
+- **External calls:** <apis/services>
+
+## 10. Security Assumptions
+
+- **Auth model:** <assumption>
+- **Data sensitivity:** <classification>
+- **Logging:** <auditing expectations>
+
+## 11. Related Specs
+
+- [specs/001-<decision>.md](specs/001-<decision>.md) — <what decision this captures>
+- [specs/002-<decision>.md](specs/002-<decision>.md) — <what decision this captures>
+- [../<related-feature>/specs/<related-spec>.md](../<related-feature>/specs/<related-spec>.md) — <cross-feature dependency, if any>

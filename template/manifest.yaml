@@ -62,3 +62,43 @@ toolshed:
   # Example:
   # tool_aliases:
   #   get_spec: fetch_feature_brief
+
+# ── Guardrails ────────────────────────────────────────────────────────────────
+# Constraints that keep the agent safe. Read by the `get_guardrails` tool.
+# The agent reads this at session start to understand what is and isn't allowed.
+#
+# guardrails:
+#   # The agent must NEVER perform these actions, no exceptions.
+#   blocked_actions:
+#     - "DROP TABLE"
+#     - "rm -rf"
+#     - "delete all"
+#     - "truncate"
+#
+#   # The agent MUST call `request_human_approval` before performing these.
+#   require_approval:
+#     - "deploy to production"
+#     - "send email"
+#     - "charge payment method"
+#     - "overwrite .env"
+#
+#   # For browser agents: limit which domains the agent may interact with.
+#   allowed_domains:
+#     - "localhost"
+#     - "staging.myapp.com"
+
+# ── Profiles & Sub-agents ────────────────────────────────────────────────────
+# You can define partial manifest overrides for specific agents (e.g. backend vs frontend).
+# Load a profile with: npx @agent-context-kit/toolshed-server --profile=backend
+#
+# profiles:
+#   frontend:
+#     guardrails:
+#       blocked_actions:
+#         - "modify database queries"
+#         - "change server routes"
+#   backend:
+#     guardrails:
+#       blocked_actions:
+#         - "modify css or styling"
+#         - "change react components"

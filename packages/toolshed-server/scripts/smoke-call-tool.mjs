@@ -38,10 +38,12 @@ try {
 
   const { tools } = await client.listTools();
   const names = tools.map((t) => t.name).sort();
-  if (names.length !== 8) {
-    fail(`expected 8 tools, got ${names.length}: ${names.join(", ")}`);
+  if (names.length !== 13) {
+    fail(`expected 13 tools, got ${names.length}: ${names.join(", ")}`);
   }
   const expected = [
+    "add_glossary_term",
+    "add_learning",
     "get_learnings",
     "get_project_identity",
     "get_prompt",
@@ -50,6 +52,9 @@ try {
     "list_prompts",
     "list_registry",
     "lookup_glossary",
+    "search_context",
+    "update_feature_status",
+    "validate_context"
   ];
   for (const n of expected) {
     if (!names.includes(n)) fail(`missing tool: ${n}`);

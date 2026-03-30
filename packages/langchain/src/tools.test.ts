@@ -32,14 +32,17 @@ describe("@agent-context-kit/langchain", () => {
       expect(() => createContextKitTools("manifest.yaml")).toThrow(/Invalid manifest.yaml structure/);
     });
 
-    it("returns exactly 8 tools with valid manifest", async () => {
+    it("returns the full Toolshed tool set with valid manifest", async () => {
       const fs = await import("fs");
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue("identity:\n  values: values.md");
       const tools = createContextKitTools("manifest.yaml");
-      expect(tools.length).toBe(8);
+      expect(tools.length).toBe(16);
       const names = tools.map((t) => t.name).sort();
       expect(names).toEqual([
+        "add_glossary_term",
+        "add_learning",
+        "get_guardrails",
         "get_learnings",
         "get_project_identity",
         "get_prompt",
@@ -48,6 +51,11 @@ describe("@agent-context-kit/langchain", () => {
         "list_prompts",
         "list_registry",
         "lookup_glossary",
+        "request_human_approval",
+        "search_context",
+        "update_feature_status",
+        "validate_context",
+        "verify_action",
       ]);
     });
   });

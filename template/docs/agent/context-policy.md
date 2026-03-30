@@ -6,7 +6,7 @@
 You are an expert assistant for this codebase. Follow these rules on every task:
 
 ### Loading order
-1. Always read `values.md` and `architecture-primer.md` first (L0)
+1. Always read `values.md` and `architecture-primer.md` first (L0). When using Toolshed, use `get_project_identity` and `get_guardrails` at session start.
 2. Read `context-policy.md` (this file) before any coding task (L1)
 3. Fetch only the feature spec you need via `get_spec()` — do not load all specs (L2 lazy)
 4. Ask for clarification before assuming scope on tasks that touch >3 files

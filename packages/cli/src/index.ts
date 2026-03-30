@@ -7,7 +7,8 @@
  *   context-kit init     — scaffold docs/agent/ in the current project
  *   context-kit sync     — update engine regions, preserve project regions
  *   context-kit check    — validate manifest, links, token budgets
- *   context-kit list     — list registry, prompts, standards
+ *   context-kit list     — list prompts and feature files
+ *   context-kit new-spec — scaffold docs/features/<name>.md + registry entry
  */
 
 import {
@@ -331,7 +332,10 @@ export function cmdNewSpec(name?: string, cwd: string = process.cwd()) {
   let templateContent = "";
   try {
     templateContent = readFileSync(templatePath, "utf8");
-    templateContent = templateContent.replace(/# \[Feature Name\]/, `# ${name}`);
+    templateContent = templateContent.replace(
+      /# Feature: <feature-name>/,
+      `# Feature: ${name}`,
+    );
     writeFileSync(destPath, templateContent, "utf8");
     ok(`Created spec: docs/features/${name}.md`);
   } catch (e) {

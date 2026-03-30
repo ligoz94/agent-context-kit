@@ -12,17 +12,21 @@ This project uses **agent-context-kit**: layered docs under `docs/agent/` plus a
 At the **start** of a substantive session (or before a large change):
 
 1. Call **`get_project_identity`** — L0: values, architecture primer, glossary.
-2. Before **coding or review**, call **`get_rules`** (optional `standard` if you only need one, e.g. `testing`).
-3. For **feature work**, call **`list_registry`**, then **`get_spec`** with the feature `name` — do **not** load every feature spec.
-4. For **terminology**, use **`lookup_glossary`** before naming new APIs or types.
-5. For **prompt templates**, use **`list_prompts`** / **`get_prompt`** when relevant.
-6. Check **`get_learnings`** before recommending patterns that might repeat past mistakes.
+2. Call **`get_guardrails`** — blocked actions, approval requirements, allowed domains (if configured).
+3. Before **coding or review**, call **`get_rules`** (optional `standard` if you only need one, e.g. `testing`).
+4. For **feature work**, call **`list_registry`**, then **`get_spec`** with the feature `name` — do **not** load every feature spec.
+5. For **terminology**, use **`lookup_glossary`** before naming new APIs or types.
+6. For **prompt templates**, use **`list_prompts`** / **`get_prompt`** when relevant.
+7. Check **`get_learnings`** before recommending patterns that might repeat past mistakes.
+8. Use **`search_context`** or **`validate_context`** when you need to locate or verify docs paths.
+
+**Persisting changes** (only if the user expects repo updates): **`add_learning`**, **`add_glossary_term`**, **`update_feature_status`**.
 
 If a tool fails (missing file), say so briefly and continue with what you can read from the repo.
 
 ## If MCP is not available
 
-Read in order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` as needed. Use `docs/features/` only for the feature you are working on.
+Read in order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` as needed. Use `docs/features/` only for the feature you are working on. Read `guardrails` in `manifest.yaml` if present.
 
 ## Discipline
 

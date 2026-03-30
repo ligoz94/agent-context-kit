@@ -1,173 +1,199 @@
 # agent-context-kit
 
-A framework for perfect LLM context on any project.
+A framework for giving LLMs the right project context at the right time—without stuffing the whole repo into the prompt.
 
-Inspired by Stripe's Developer Toolshed pattern. Language-agnostic, editor-agnostic, LLM-agnostic.
-
----
-
-## 🛑 The Problem
-
-Every AI/LLM agent starts blind when it enters your codebase. You either dump too much context (wasting tokens, causing noisy or "hallucinated" output) or too little (resulting in generic, incorrectly architected code). There is no standard way to tell an agent *what this project is, how it works, and what not to do*.
-
-## 💡 The Solution
-
-`agent-context-kit` uses a **4-layer context structure** combined with dynamic tools to expose your project's knowledge graph to AI agents exactly when they need it. Agents fetch what they need dynamically instead of reading the whole repository.
-
-### 📚 The 4 Layers of Context
-
-- **L0 Identity (The Core DNA):** Always loaded and kept as compact as possible. This includes your non-negotiable project values (`values.md`), high-level repository map (`architecture-primer.md`), and domain glossary. It provides the absolute baseline understanding of *what* the project is.
-- **L1 Rules (The Standards):** Loaded per task. These are your architectural laws and best practices for specific parts of the stack (e.g., "React Components Standard" or "Database Access Policy"). Agents fetch these based on the specific subsystem they are working on.
-- **L2 Knowledge (The Deep Context):** Fetched strictly on demand. This layer contains detailed feature specifications (`docs/features/`), past architectural decisions (`docs/decisions/`), and specific pitfalls to avoid (`key-learnings.md`). It ensures agents don't hallucinate implementation details for complex app features.
-- **L3 Context (The Task at Hand):** The immediate, real-time context. This is your active chat prompt, the files you currently have open in your editor, and your local terminal output. This is managed by the user and the IDE/Client.
-
-### ✨ Key Advantages
-- **Single Source of Truth:** Stop copying and pasting prompts. Define your rules in `manifest.yaml` and standard Markdown files.
-- **Strict Validation:** Built-in Zod schema validation ensures your configuration files are perfectly formatted before agents read them.
-- **Universal Compatibility:** Expose your context via **MCP (Model Context Protocol)** to IDEs like Cursor and Claude Desktop, OR natively via **LangChain** directly in your Node.js agents.
-- **Token Efficiency:** The toolkit actively prevents you from blowing out LLM context windows by enforcing token budgets on your architectural documents.
+Inspired by Stripe’s Developer Toolshed pattern. Language-agnostic, editor-agnostic, and model-agnostic.
 
 ---
 
-## 🚀 How to Use It (Quickstart)
+## The problem
 
-### 1. Scaffold your project
-Run the CLI in the root of your repository to generate the base structure:
+Agents start cold: either you paste too much (noisy, expensive) or too little (generic or wrong architecture). There is no shared convention for *what this project is*, *how we work*, and *what must never happen*.
+
+## The solution
+
+**agent-context-kit** splits knowledge into **layers** and exposes it through **tools** (MCP and LangChain) so the model pulls only what the task needs.
+
+### Context layers
+
+| Layer | Role | Typical content |
+|-------|------|-----------------|
+| **L0 — Identity** | Baseline orientation | Values, architecture primer, glossary |
+| **L1 — Rules** | How we build and review | Context policy, team standards |
+| **L2 — Knowledge** | On-demand depth | Feature specs, learnings, extra doc trees |
+| **L3 — Task** | Immediate work | Chat, open files, terminal (you / the IDE) |
+
+The **manifest** (`manifest.yaml`) is the single source of truth: paths, registry, prompts, optional **guardrails**, and optional **profiles** for different agents or sub-teams.
+
+### Why it helps
+
+- **One source of truth** — Rules live in markdown and YAML, not copy-pasted prompts.
+- **Validated config** — The manifest is checked so broken paths fail fast.
+- **Flexible delivery** — Same tools over **stdio MCP** (Cursor, Claude Desktop, …) or **LangChain** in Node.
+- **Token discipline** — CLI checks encourage keeping L0/L1/L2 files within sensible sizes.
+
+---
+
+## Quickstart
+
+### 1. Scaffold
+
+From your repository root:
+
 ```bash
 npx @agent-context-kit/cli init
 ```
 
-### 2. Define your knowledge
-This creates a `manifest.yaml` and a `docs/agent/` folder. Fill in the Markdown files:
-- `values.md` → Your non-negotiables (e.g., "Always use Tailwind", "Never fetch on the client").
-- `glossary.md` → Your project terms.
-- `architecture-primer.md` → Your codebase map.
+This adds `manifest.yaml`, `docs/agent/*`, `docs/features/`, `docs/human/`, `docs/decisions/`, Cursor rules, and `CLAUDE.md`.
 
-### 3. Consume the context
+### 2. Fill in your project
 
-You can feed this context to AI agents in two ways:
+- `manifest.yaml` — project name, stack, registry entries, optional `guardrails` and `profiles`
+- `docs/agent/values.md`, `glossary.md`, `architecture-primer.md` — L0
+- `docs/agent/context-policy.md` — L1 loading and tone
+- `docs/human/*.md` — standards linked from `rules.standards` in the manifest
 
-#### Option A: IDEs / MCP Clients (Cursor, Claude Desktop)
-Start the Toolshed server out of the box. It implements the standard Model Context Protocol:
+### 3. Run checks
+
+```bash
+npx @agent-context-kit/cli check
+```
+
+### 4. Wire the Toolshed (MCP)
+
 ```bash
 npx @agent-context-kit/toolshed-server
 ```
-*See `docs/human/toolshed-mcp-setup.md` inside your repo after initialization for full IDE setup instructions.*
 
-#### Option B: LangChain.js Agents
-If you are building your own custom agents in Node/TypeScript, you can import your project context directly as LangChain tools and track them via LangSmith.
+Use `--manifest /path/to/manifest.yaml` if the file is not at the process working directory. Use `--profile <name>` to merge a `profiles.<name>` block from the manifest (e.g. frontend vs backend guardrails).
+
+Full editor setup: after `init`, see `docs/human/toolshed-mcp-setup.md` in your project.
+
+### 5. Optional: LangChain
+
 ```bash
 npm install @agent-context-kit/langchain
 ```
+
 ```typescript
 import { createContextKitTools, enableLangSmith } from "@agent-context-kit/langchain";
 
-// Enable tracing to see exactly what context the LLM is reading
 enableLangSmith({ projectName: "my-agent-demo" });
 
-// Generate 8 DynamicStructuredTools that read from your project
-const tools = createContextKitTools("./manifest.yaml");
-
-// Pass the tools to any LangChain agent executor!
+const tools = createContextKitTools("./manifest.yaml", {
+  // optional: profile: "backend"
+});
 ```
 
----
-
-## 📖 Example Workflow (In Practice)
-
-Here is a step-by-step example of how `agent-context-kit` fundamentally changes how you code with AI:
-
-1. **The Goal:** You need to build a new "User Settings" page in your web app.
-2. **The Prompt:** You open Cursor (or Claude) and ask: *"Build the User Settings page."*
-3. **What the LLM does (Behind the Scenes):**
-   - **Step A (Orientation):** Before writing any code, the LLM calls the `get_project_identity` tool. It reads your `values.md` and discovers: *"Ah, this team strictly uses Tailwind CSS and React Server Components. No client-side fetching allowed."*
-   - **Step B (Specific Rules):** The LLM then calls `get_rules({ standard: "react" })` to read your team's specific component structure guidelines.
-   - **Step C (Past Mistakes):** The LLM calls `get_learnings` and reads: *"Do not use the native HTML select dropdown, it's bugged on our layout. Always use the shadcn/ui Select."*
-4. **The Result:** The LLM generates the exact, perfect code for the Settings page on its very first try, perfectly matching your company's architecture without you having to write a 3-page prompt.
+Pass `tools` to your agent like any other LangChain tools. Tool names respect `toolshed.tool_aliases` in the manifest.
 
 ---
 
-## 🛠️ The Toolshed Tools
+## Example session flow
 
-Whether using MCP or LangChain, your agent automatically gains access to these 8 tools:
+1. You ask the agent to implement something.
+2. It calls **`get_project_identity`** (L0) and **`get_guardrails`** (blocked actions, approval rules, allowed domains).
+3. It calls **`get_rules`** (and optionally a single `standard`) before coding.
+4. For one feature, it calls **`list_registry`** then **`get_spec`** with that name—not every spec.
+5. It uses **`get_learnings`**, **`lookup_glossary`**, **`list_prompts` / `get_prompt`** when relevant.
+6. It may **`search_context`** or **`validate_context`** to locate or sanity-check docs.
 
-| Tool | What it returns |
-|------|----------------|
-| `get_project_identity` | L0: values + architecture + glossary |
-| `get_rules` | L1: context policy + standards |
-| `get_learnings` | L2: key learnings |
-| `get_spec` | L2: spec for a named feature |
-| `list_registry` | All features with status |
-| `lookup_glossary` | Definition of a specific term |
-| `get_prompt` | A named prompt template |
-| `list_prompts` | All available prompts |
+Write-capable tools (**`add_learning`**, **`add_glossary_term`**, **`update_feature_status`**) change files or the manifest; use them only when the team wants the agent to persist updates.
 
 ---
 
-## 📦 Packages Overview
+## Tools reference (MCP & LangChain)
 
-This monorepo is fully typed, tested (Vitest), and CI-ready. It consists of three packages:
+Canonical names below; aliases from `manifest.yaml` → `toolshed.tool_aliases` apply everywhere.
 
-| Package | Purpose |
-|---------|---------|
-| `@agent-context-kit/cli` | `context-kit` CLI commands (`init`, `sync`, `check`) |
-| `@agent-context-kit/toolshed-server` | Standalone MCP server executable |
-| `@agent-context-kit/langchain` | LangChain adapters, Callbacks, and LangSmith Evaluators |
+### Read context
 
-### Concrete Examples
-Look inside the `/examples` directory of this repository to see fully fleshed out, realistic setups:
-- `/examples/basic-web-app`: Shows what a realistic `manifest.yaml` and documentation suite looks like for a Next.js App Router project.
-- `/examples/langchain-agent`: A running OpenAI conversational agent script demonstrating the LangChain observability integration.
+| Tool | Purpose |
+|------|---------|
+| `get_project_identity` | L0: values, architecture primer, glossary |
+| `get_guardrails` | Blocked actions, `require_approval` list, `allowed_domains` |
+| `get_rules` | L1: context policy + standards (`standard` optional) |
+| `get_learnings` | L2: `key-learnings.md` |
+| `get_spec` | One feature spec from `registry` (`name`) |
+| `list_registry` | All registered features and statuses |
+| `lookup_glossary` | Term lookup (`term` optional) |
+| `get_prompt` | Prompt template + optional `variables` for `{{placeholders}}` |
+| `list_prompts` | Available prompt files |
+| `search_context` | Search across configured paths for a string/regex |
+
+### Validate & persist
+
+| Tool | Purpose |
+|------|---------|
+| `validate_context` | Check manifest paths exist |
+| `add_learning` | Append a bullet to `key-learnings.md` |
+| `add_glossary_term` | Append term + definition to `glossary.md` |
+| `update_feature_status` | Update a feature’s `status` in `manifest.yaml` |
+
+### Safety & verification
+
+| Tool | Purpose |
+|------|---------|
+| `request_human_approval` | Structured pause before risky actions (pair with `require_approval`) |
+| `verify_action` | Post-checks: file exists/contains/mtime, command, HTTP status, JSON path, etc. |
 
 ---
 
-## ⚙️ CLI Reference
+## CLI reference
 
-Ensure your context repository stays healthy with the toolkit's CLI:
+| Command | Description |
+|---------|-------------|
+| `context-kit init` | Scaffold manifest and docs (skips existing files) |
+| `context-kit check` | Required files + rough L0 token warnings |
+| `context-kit sync` | Refresh **engine** regions in agent markdown; **project** regions stay yours |
+| `context-kit list` | Lists prompts and feature markdown files under `docs/features/` |
+| `context-kit new-spec <name>` | Creates `docs/features/<name>.md` from the template and adds a `registry` entry (`wip`) |
 
-### `context-kit init`
-Scaffolds the `manifest.yaml` and `docs/agent/` structure into your current directory. It safely skips files that already exist.
+### Engine vs project regions (sync)
 
-### `context-kit check`
-Your project's safety net. It runs a full validation pass before the MCP server boots:
-- **Manifest Validation:** Ensures your `manifest.yaml` conforms to the Zod schema.
-- **Link Auditing:** Verifies that every file referenced in the manifest actually exists on disk.
-- **Token Budgets:** Analyzes your markdown files and warns you if they exceed the recommended token limits (see Token Budgets below), preventing you from overflowing the LLM.
+Kit-managed hints live between:
 
-### `context-kit sync`
-Updates the underlying kit instructions in your documentation files without touching your custom project data.  
+`<!-- agent-context-kit:engine:start -->` … `<!-- agent-context-kit:engine:end -->`
 
-Since you write your project knowledge inside the same Markdown files that the LLM uses for its meta-prompt instructions, the files contain two kinds of regions:
+Your content lives between:
 
-- **Engine Regions (`<!-- agent-context-kit:engine:start -->`)**: These blocks contain instructions generated by the toolkit itself (e.g., telling the LLM to prioritize certain rules or how many tokens it has left to read). When you run `sync`, the CLI fetches the latest upstream improvements for these blocks and replaces them.
-- **Project Regions (`<!-- agent-context-kit:project:start -->`)**: This is where you write *your* actual content (your architecture, your values, your feature specs). The `sync` command will **never** overwrite or touch anything inside these blocks.
+`<!-- agent-context-kit:project:start -->` … `<!-- agent-context-kit:project:end -->`
 
-Example of a tracked Markdown file:
-```markdown
-<!-- agent-context-kit:engine:start -->
-# L0: Identity & Values
-> **Goal:** Align AI output with team non-negotiables. Define *how* we build things here.
-> **Target:** < 400 tokens. Broad impact across all interactions.
-<!-- agent-context-kit:engine:end -->
+`sync` only updates engine blocks.
 
-<!-- agent-context-kit:project:start -->
-Your custom project values go here. This text is perfectly preserved during a sync!
-<!-- agent-context-kit:project:end -->
-```
+### Token budget hints (`check`)
 
-### `context-kit list`
-A quick utility to list all currently active features and prompts registered in your manifest.
+| Layer | Target | Warn above (approx.) |
+|-------|--------|------------------------|
+| L0 (identity files) | < 800 tokens | ~800 tokens/file check |
+| L1 | team choice | — |
+| L2 per spec | keep focused | — |
 
-## Token Budget Guidelines
+---
 
-`context-kit check` will warn you if your context limits exceed:
+## Monorepo packages
 
-| Layer | Target | Hard limit |
-|-------|--------|-----------|
-| L0 (identity) | < 800 tokens | 1500 |
-| L1 (rules) | < 600 tokens | 1200 |
-| L2 per spec | < 400 tokens | 800 |
-| L3 (task) | your call | — |
+| Package | Role |
+|---------|------|
+| `@agent-context-kit/cli` | `context-kit` commands |
+| `@agent-context-kit/toolshed-server` | stdio MCP server |
+| `@agent-context-kit/langchain` | LangChain tools + LangSmith helpers |
+
+Examples:
+
+- `examples/basic-web-app` — sample manifest and feature specs
+- `examples/langchain-agent` — agent that uses `createContextKitTools`
+
+---
+
+## Manifest highlights
+
+- **`identity` / `rules` / `knowledge`** — L0, L1, L2 paths. `knowledge` can include extra directories (e.g. `backend:`) whose `.md` files are indexed for search and context.
+- **`registry`** — Features exposed through `get_spec` / `list_registry`
+- **`prompts.dir`** — Templates for `get_prompt` / `list_prompts`
+- **`toolshed.tool_aliases`** — Rename tools when two MCP servers clash
+- **`guardrails`** — `blocked_actions`, `require_approval`, `allowed_domains` (read via `get_guardrails`)
+- **`profiles`** — Deep-merge overrides; activate with `toolshed-server --profile <name>` or `createContextKitTools(path, { profile: "<name>" })`
 
 ---
 

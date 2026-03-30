@@ -1,6 +1,6 @@
 # Toolshed MCP server — setup guide
 
-This guide configures **`@agent-context-kit/toolshed-server`** so your editor or client can call Toolshed tools (`get_project_identity`, `get_rules`, `get_spec`, etc.) against **your** project’s `manifest.yaml` and `docs/`.
+This guide configures **`@agent-context-kit/toolshed-server`** so your editor or client can call Toolshed tools (`get_project_identity`, `get_guardrails`, `get_rules`, `get_spec`, `search_context`, etc.) against **your** project’s `manifest.yaml` and `docs/`.
 
 ## Prerequisites
 
@@ -31,14 +31,27 @@ This guide configures **`@agent-context-kit/toolshed-server`** so your editor or
 }
 ```
 
+Optional profile (merges `profiles.<name>` in the manifest):
+
+```json
+"args": [
+  "${workspaceFolder}/packages/toolshed-server/dist/index.js",
+  "--manifest",
+  "${workspaceFolder}/template/manifest.yaml",
+  "--profile",
+  "backend"
+]
+```
+
 For **another project** on disk, use absolute paths or set `"cwd"` to that project and pass `--manifest` relative to it.
 
 Alternatives: `npm link` inside `packages/toolshed-server` then `"command": "toolshed-server"`, or `file:../path/to/packages/toolshed-server` in a local package — same idea: do not rely on the public registry until published.
 
 ## What the server needs
 
-1. **Working directory (`cwd`)** — must be the **project root** (the directory that contains `manifest.yaml`). The server resolves every path in the manifest relative to that file’s directory.
+1. **Working directory (`cwd`)** — usually the **project root** (the directory that contains `manifest.yaml`). Path entries in the manifest resolve relative to the manifest file’s directory.
 2. **Optional: custom manifest path** — add `--manifest /absolute/or/relative/path/to/manifest.yaml` if the file is not named `manifest.yaml` or not at the repo root.
+3. **Optional: profile** — `--profile <name>` deep-merges `profiles.<name>` from the manifest (e.g. different guardrails per agent).
 
 ## Claude Desktop
 
@@ -65,6 +78,12 @@ Edit the MCP config file (platform-specific path — see [Anthropic MCP docs](ht
 "args": ["-y", "@agent-context-kit/toolshed-server", "--manifest", "./config/manifest.yaml"]
 ```
 
+**Profile:**
+
+```json
+"args": ["-y", "@agent-context-kit/toolshed-server", "--profile", "frontend"]
+```
+
 Paths in `args` are resolved from `cwd`.
 
 ## Cursor
@@ -88,7 +107,7 @@ Use the **same rules** as Claude Desktop: `cwd` = root with `manifest.yaml`. Res
 
 ## Tool name collisions
 
-If another server already exposes tools with the same names, set **`toolshed.tool_aliases`** in `manifest.yaml` (see the root README / manifest comments). Aliases apply to both listing and invocation.
+If another server already exposes tools with the same names, set **`toolshed.tool_aliases`** in `manifest.yaml` (see the kit README / manifest comments). Aliases apply to both listing and invocation.
 
 ## Verify locally (stdio)
 
@@ -109,8 +128,9 @@ You should see stderr like `[toolshed] Running. Manifest: .../manifest.yaml`. Th
 | `npx` slow every time | Prefer a global install (`npm i -g @agent-context-kit/toolshed-server`) and set `"command": "toolshed-server"` if your environment allows it. |
 | `npm error 404` for `@agent-context-kit/toolshed-server` | Package not published yet — use **`node`** + local `dist/index.js` (section above) or publish / private registry. |
 | Wrong project’s docs | Wrong `cwd` — each MCP server instance should point at one project root. |
+| Profile not applied | Use `--profile <name>` and ensure `profiles.<name>` exists in `manifest.yaml`. |
 
 ## Related
 
 - Package: `@agent-context-kit/toolshed-server`
-- Manifest reference: `manifest.yaml` in this repo’s README
+- Full tool list and CLI: root **README** of the agent-context-kit repo

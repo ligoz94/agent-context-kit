@@ -13,7 +13,7 @@ Paths listed under `rules.standards` in `manifest.yaml` (for example `docs/human
 
 ## Files in this template
 
-- **`toolshed-mcp-setup.md`** — how to register `@agent-context-kit/toolshed-server` in Cursor, Claude Desktop, and related clients (`cwd`, `--manifest`, aliases, troubleshooting).
+- **`toolshed-mcp-setup.md`** — how to register `@agent-context-kit/toolshed-server` in Cursor, Claude Desktop, and related clients (`cwd`, `--manifest`, `--profile`, aliases, troubleshooting).
 
 ## Related
 

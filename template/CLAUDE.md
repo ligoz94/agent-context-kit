@@ -8,23 +8,29 @@ If the **Toolshed** server is configured for this project (`manifest.yaml` at th
 
 | When | Tool |
 |------|------|
-| Session start / orientation | `get_project_identity` |
+| Session start / orientation | `get_project_identity`, **`get_guardrails`** |
 | Before coding or review | `get_rules` (optionally `standard`: e.g. `testing`) |
 | Feature work | `list_registry` → `get_spec` with `name` — lazy L2, not all specs |
 | Naming / domain terms | `lookup_glossary` |
 | Prompt files | `list_prompts`, `get_prompt` |
 | Avoid repeating past mistakes | `get_learnings` |
+| Find text across docs | `search_context` |
+| Sanity-check paths | `validate_context` |
+
+**Write tools** (only when the user wants the repo updated): `add_learning`, `add_glossary_term`, `update_feature_status`.
+
+**Safety / verification**: use `request_human_approval` when guardrails say so; use `verify_action` after critical changes when appropriate.
 
 Do **not** fetch every feature spec; only the one needed for the current task.
 
 ## Without MCP
 
-Read in this order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` when relevant. Open **one** feature file under `docs/features/` when working on that feature.
+Read in this order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` when relevant. Open **one** feature file under `docs/features/` when working on that feature. If `manifest.yaml` defines `guardrails`, read that section manually.
 
 ## Source of truth
 
-- **`manifest.yaml`** — paths and Toolshed options (including `tool_aliases` if tools collide with other MCP servers).
-- **L0** — identity files; **L1** — `context-policy.md` + human standards in `manifest.yaml` → `rules.standards`; **L2** — learnings, feature specs, prompts.
+- **`manifest.yaml`** — paths, registry, prompts, `toolshed` options (`tool_aliases`), optional `guardrails` and `profiles`
+- **L0** — identity files; **L1** — `context-policy.md` + human standards from `rules.standards`; **L2** — learnings, feature specs, prompts, optional knowledge directories
 
 ## Tone
 

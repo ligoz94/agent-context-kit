@@ -162,6 +162,7 @@ export function cmdInit(cwd: string = process.cwd()) {
   }
 
   copyTemplateDirFiles(templateDir, "docs/agent/evals", cwd);
+  copyTemplateDirFiles(templateDir, "docs/agent/prompts", cwd);
 
   copyTemplate(
     join(templateDir, "docs/features/_template.md"),

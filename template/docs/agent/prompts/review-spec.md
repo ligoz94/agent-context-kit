@@ -1,82 +1,147 @@
-# Review spec
+# Review Spec Prompt
 
-Review a spec (or decision spec) for completeness, clarity, and implementability. Use when a PR adds or materially changes a specification document.
+Review a spec (implementation plan) for completeness, clarity, and implementability. Use when a PR introduces or significantly updates a spec document.
 
-## Reading
+## Required Reading
 
-1. **[values.md](../values.md)** — intent and spec quality
-2. **Repo spec template** — e.g. [docs/features/specs/_template.md](../../features/specs/_template.md) (adjust path if your project differs)
-3. **Parent feature doc** (e.g. `docs/features/<area>/feature.md`)
-4. **Dependent specs** cited in the document
+1. **[Intent Engineering Standard](../values.md)** — spec requirements (especially [Intent Extraction Template](../values.md#intent-extraction-template-internal-agent-step))
+2. **App's spec template** — canonical structure (find via app-config.md § Spec System)
+3. **Feature doc** — the parent feature doc linked from the spec
+4. **Related specs** — any specs listed in the Dependencies field
 
-> **Toolshed MCP**: `get_spec`, `list_registry`, `lookup_glossary`.
+> **MCP Toolshed**: If available (check app-config.md § MCP Toolshed), use `get_spec` / `get_feature_doc` / `lookup_glossary` instead of manually opening files.
 
 ## Process
 
-1. Read the spec under review
-2. Read parent feature doc and dependencies
-3. Evaluate dimensions below
-4. Verdict with actionable findings
+1. Read the spec being reviewed
+2. Read its parent feature doc (linked in spec header)
+3. Read dependency specs (listed in spec header)
+4. Evaluate against all dimensions below
+5. Output verdict with findings
 
-## Dimensions
+## Review Dimensions
 
-### 1. Template compliance
+### Template Compliance
 
-- [ ] Expected metadata (status, owner, feature link, dependencies)
-- [ ] Required sections from the team template present and filled
+Compare against the app's spec template:
 
-### 2. Intent completeness
+- [ ] **Status** field present and correct (`needs-discovery` | `planned` | `partial` | `implemented`)
+- [ ] **Feature doc** link present and valid
+- [ ] **Dependencies** listed or stated "none"
+- [ ] All required sections present: Parsed Intent, Unknowns, Tasks, Validation Plan, Test Commands, Risks, Acceptance Criteria
 
-The spec should make derivable (explicitly or via sections):
+**If missing sections**: Request additions per template
 
-| Area | Check |
-|------|--------|
-| Objective | Clear and bounded |
-| Constraints | Technical and product |
-| Non-goals | Explicit out-of-scope |
-| Input/output | Understandable data contracts |
-| Failure states | Errors, edges, degradation |
-| Security | Auth, secrets, trust boundaries |
-| Acceptance | Verifiable, measurable |
+### Intent Completeness
 
-### 3. Implementability
+From [values.md Intent Extraction Template](../values.md#intent-extraction-template-internal-agent-step), the spec must cover all fields:
 
-Could an implementer (or agent) proceed without blocking questions?
+| Field                   | Check                                        |
+| ----------------------- | -------------------------------------------- |
+| **Objective**           | Clear, scoped, traceable to feature doc      |
+| **Constraints**         | Technical and business constraints explicit  |
+| **Non-goals**           | What is explicitly out of scope?             |
+| **Data inputs**         | Formats, sources, schemas defined            |
+| **Data outputs**        | Response shapes, contracts defined           |
+| **Failure states**      | Error paths, edge cases, degraded modes      |
+| **Security boundaries** | Auth, secrets, data access, trust boundaries |
+| **Acceptance criteria** | Testable, measurable, no ambiguity           |
 
-- [ ] Tasks or equivalent tied to concrete files/modules or plausible new paths
-- [ ] Contracts not vague (“handle properly” without criteria)
-- [ ] Unknowns honest; they do not hide total blockers
+- [ ] All 8 fields addressed (directly or inferable from Parsed Intent + other sections)
+- [ ] No field left empty or vague
 
-### 4. Security and data
+**If any field is empty or vague**: Flag as spec gap — the spec cannot be safely implemented
 
-- [ ] Auth/authorization where needed
-- [ ] No unjustified client-side secrets
-- [ ] Data flows and trust boundaries for exposed surfaces
+### Implementability
 
-### 5. Scope and non-goals
+Could an agent implement this spec without asking clarifying questions?
 
-- [ ] Bounded scope; breaking changes called out if any
-- [ ] Rollout / feature flags if the team uses incremental release
+- [ ] Tasks reference specific file paths (existing or new)
+- [ ] Data contracts are concrete (schemas, types, field names), not hand-wavy
+- [ ] Design decisions explain the "why", not just the "what"
+- [ ] Unknowns are honest and bounded — they don't block core implementation
+- [ ] No implicit knowledge required (domain terms explained or linked to domain docs)
 
-### 6. Failure and edge cases
+**If vague**: "An agent reading only this spec and the linked docs should be able to implement without clarification. What's missing?"
 
-- [ ] Realistic errors (network, auth, bad input, dependency down)
-- [ ] UX in error states not left undefined
+### Security & Data Boundaries
 
-### 7. Dependencies
+From [values.md Security Is Structural](../values.md#security-is-structural-not-advisory):
 
-- [ ] Dependencies on other specs or modules clear and achievable in current state
+- [ ] Auth requirements explicit (which endpoints/actions need auth, what roles)
+- [ ] Secret handling specified (no client-side secrets, key paths, token lifetimes)
+- [ ] Data flow documented (where does data go?)
+- [ ] Trust boundaries marked (what input is untrusted?)
+- [ ] Third-party service calls identified and justified
 
-### 8. Testability
+**If missing**: Block until security boundaries are documented
 
-- [ ] Validation plan tied to acceptance criteria
-- [ ] Prefer automation where it fits the change type
+### Scope & Non-Goals
 
-## Verdict
+- [ ] Non-goals section present (explicit "we will NOT do X")
+- [ ] Scope is bounded — no open-ended tasks
+- [ ] Existing contracts preserved (or breaking changes called out)
 
-Table `dimension | pass/fail/partial | notes`, then a list of findings.
+**If unbounded**: "What's the boundary? Without non-goals, an implementer may over-build."
 
-## Next step (agent instruction)
+### Failure States & Edge Cases
 
-- Findings → “Address before implementation.”
-- Approved → “Ready for **implement-feature** when the team signals OK (merge, label, etc.).”
+- [ ] Error scenarios documented (network failure, auth failure, invalid input, service unavailable)
+- [ ] Degraded mode behavior defined (what does the user see when things go wrong?)
+- [ ] Recovery strategy specified (retry? fallback? user action needed?)
+- [ ] Risks section addresses realistic failure modes, not just theoretical
+
+**If thin**: "Failure states are the most common source of production bugs. What happens when [X] fails?"
+
+### Dependencies & Integration
+
+- [ ] Dependency specs linked and their status checked
+- [ ] Integration points are concrete (endpoint paths, hook names, component boundaries)
+- [ ] No circular dependencies introduced
+- [ ] Impact on existing functionality assessed
+
+**If unresolved**: "Dependency [X] is in status [Y]. Can this spec be implemented independently?"
+
+### Testability
+
+- [ ] Validation plan covers acceptance criteria
+- [ ] Automated tests specified (not just manual verification)
+- [ ] Edge cases from failure states have test coverage
+
+**If manual-only**: "Manual testing doesn't prevent regressions. What can be automated?"
+
+## Review Checklist
+
+Quick summary:
+
+- [ ] Template compliance (all sections present, correct status)
+- [ ] Intent completeness (all 8 fields from Intent Extraction Template)
+- [ ] Implementability (agent can implement without clarification)
+- [ ] Security boundaries documented
+- [ ] Scope bounded with non-goals
+- [ ] Failure states and edge cases covered
+- [ ] Dependencies resolved or non-blocking
+- [ ] Testability (automated where possible)
+
+**Approve only if all checked.**
+
+## Verdict Format
+
+Output a table summarizing each dimension:
+
+```
+| # | Dimension | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | Template compliance | pass/fail/partial | ... |
+| 2 | Intent completeness | pass/fail/partial | ... |
+| ...
+```
+
+Then list concrete findings as actionable items.
+
+## Next Step
+
+> **Agent instruction**: After the review verdict:
+>
+> - If **findings exist** → prompt: _"Spec review complete with findings. Address these before implementation."_
+> - If **approved with no findings** → prompt: _"Spec approved. Ready for implementation — run `/implement-feature` when ready."_

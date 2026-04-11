@@ -1,37 +1,65 @@
 # Fix PR
 
-Address PR findings (review threads + CI failures), commit, push, and wait for green CI.
+Fix all PR findings (review comments + CI failures), commit, push, and wait for CI green.
 
-## Step 1 — Identify the PR
+## Step 1 — Identify PR
 
-If no number is given, detect from the current branch (example with GitHub CLI):
+If a PR number is provided, use it. Otherwise, detect from the current branch:
 
 ```bash
 gh pr view --json number --jq '.number'
 ```
 
-## Step 2 — Gather findings
+## Step 2 — Gather Findings
+
+Run these in parallel:
 
 ### 2a. Unresolved review threads
 
-Use your forge’s API or CLI. Example pattern with GitHub GraphQL (replace `<id>` with PR number):
+Detect the repo owner and name automatically:
 
 ```bash
 REPO_OWNER=$(gh repo view --json owner --jq '.owner.login')
 REPO_NAME=$(gh repo view --json name --jq '.name')
 ```
 
-Query `reviewThreads` for the PR and filter `isResolved == false`.
+Then fetch threads:
 
-### 2b. CI checks
+```bash
+GH_PAGER=cat gh api graphql -f query='
+{
+  repository(owner: "'$REPO_OWNER'", name: "'$REPO_NAME'") {
+    pullRequest(number: <id>) {
+      reviewThreads(first: 50) {
+        nodes {
+          id
+          isResolved
+          comments(first: 20) {
+            nodes {
+              path
+              line
+              body
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  }
+}' | jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | {threadId: .id, path: .comments.nodes[0].path, line: .comments.nodes[0].line, author: .comments.nodes[0].author.login, body: .comments.nodes[0].body}]'
+```
+
+Replace `<id>` with the PR number.
+
+### 2b. CI check failures
 
 ```bash
 gh pr checks <id> --json name,state,link | jq '[.[] | select(.state != "SUCCESS")]'
 ```
 
-If all green and no open threads: report “PR is clean” and stop.
+If all checks pass and no unresolved threads: report "PR is clean" and stop.
 
-For failed runs:
+For failed CI checks, fetch logs:
 
 ```bash
 gh run view <run-id> --log-failed
@@ -39,28 +67,67 @@ gh run view <run-id> --log-failed
 
 ## Step 3 — Triage
 
-For each comment:
+For each review comment:
 
-1. Read file and context
-2. Classify: real bug | false positive | discussion (needs human)
-3. CI: real failure | flaky (re-run once, then investigate)
+1. Read the file at the referenced path and line
+2. Understand the comment's claim
+3. Classify:
+
+| Source         | Classification            | Action                                 |
+| -------------- | ------------------------- | -------------------------------------- |
+| Review comment | **Real bug**              | Fix                                    |
+| Review comment | **False positive**        | Resolve with rationale                 |
+| Review comment | **Question / discussion** | Leave open (needs human)               |
+| CI failure     | **Real failure**          | Fix                                    |
+| CI failure     | **Flaky test**            | Re-run once; if still red, investigate |
 
 ## Step 4 — Fix
 
-Apply fixes per [values.md](../values.md), standards in `manifest.yaml`, and [key-learnings.md](../key-learnings.md).
+Apply all fixes following code standards from [values.md](../values.md) and the app's key-learnings.md.
 
-Use the same commands CI runs locally when possible.
+Common CI fixes (adapt to your stack):
 
-## Step 5 — Resolve threads (where supported)
+- **Lint**: fix the violation; don't suppress without researching proper fix
+- **Types**: run `<typecheck-command>` to isolate failures
+- **Snapshots**: update and verify content is **correct** (not just consistent)
+- **Formatting**: run `<format-check-command>`
 
-Resolve only where you fixed or dismissed with rationale. Leave discussion threads open if a human must decide.
+## Step 5 — Resolve Addressed Threads
 
-## Step 6 — Commit and push
+For every thread fixed (real bug) or dismissed (false positive):
 
-1. Sync with the team’s base branch (`main` / `develop`): `git fetch` + merge or rebase per convention
-2. Stage specific paths (avoid unnecessary `git add -A`)
-3. Message referencing review/CI
-4. `git push`
+```bash
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: {threadId: "<thread-node-id>"}) {
+    thread { isResolved }
+  }
+}'
+```
+
+Do NOT resolve discussion/question threads — those need human input.
+
+## Step 6 — Commit & Push
+
+1. Rebase on main first: `git fetch origin main && git rebase origin/main`
+2. Stage changed files (specific files, not `git add -A`)
+3. Commit with descriptive message referencing the PR findings
+4. Push: `git push`
+5. After successful push, reset AI labels (see [pr-labeling.md](../pr-labeling.md)). Labels still reflect **pre-push** state until this step — use them to choose the next state:
+   - If the PR had `ai:reviewed`, `ai:changes-requested`, or `ai:review-stale` → add **`ai:review-stale`** (prior AI verdict no longer matches HEAD).
+   - Otherwise (e.g. only `ai:not-reviewed` — CI fixes before first AI review) → add **`ai:not-reviewed`**.
+
+   Use a two-step clear-then-set to prevent stale labels regardless of prior state:
+
+   ```bash
+   LABELS=$(gh pr view <number> --json labels --jq '.labels[].name')
+   gh pr edit <number> --remove-label "ai:reviewing,ai:reviewed,ai:changes-requested,ai:review-stale,ai:not-reviewed"
+   if echo "$LABELS" | grep -qE '^ai:reviewed$|^ai:changes-requested$|^ai:review-stale$'; then
+     gh pr edit <number> --add-label "ai:review-stale"
+   else
+     gh pr edit <number> --add-label "ai:not-reviewed"
+   fi
+   ```
 
 ## Step 7 — Wait for CI
 
@@ -68,13 +135,45 @@ Resolve only where you fixed or dismissed with rationale. Leave discussion threa
 gh pr checks <id> --watch
 ```
 
-If it fails again: one more fix iteration; if the loop does not converge, summarize and escalate to a human.
+If checks fail again:
 
-## Step 8 — Summary
+- **1st retry**: Diagnose and fix the new failure, push again
+  - Wait a few minutes and then check for new automated CI comments — go back to step 2b to fetch any new failures.
+- **2nd failure**: Halt and report — summarize remaining failures, request human input. Do NOT attempt further CI loops.
 
-Table: source, file, verdict, action, status. Final CI state.
+## Step 8 — Summary & PR Comment
 
-## Next step (agent instruction)
+Output the resolution table to the conversation, then post it as a PR comment.
 
-- All green → “Ready for human merge.”
-- Remaining items → list what needs humans.
+Detect the fix round:
+
+```bash
+ROUND=$(gh pr view <number> --json comments --jq '[.comments[].body | select(test("^## AI Fix-PR Resolution"))] | length + 1')
+```
+
+Fill in the `**Agent:**` single-line string per [values.md § Agent Identification](../values.md#agent-identification-canonical-format) — all 3 fields, no shortcuts.
+
+```bash
+gh pr comment <number> --body "$(cat <<'EOF'
+## AI Fix-PR Resolution (Round [N])
+
+**Agent:** <tool> · `<model-id>` · effort=<effort>
+
+| # | Source | File:Line | Verdict | Action | Status |
+|---|--------|-----------|---------|--------|--------|
+| 1 | review | ... | real bug | fixed | resolved |
+| 2 | review | ... | false positive | dismissed | resolved |
+| 3 | CI | lint | real failure | fixed | passing |
+
+**CI status:** all green / still failing
+**Open threads:** [count remaining, or "none"]
+EOF
+)"
+```
+
+## Next Step
+
+> **Agent instruction**: After the summary and PR comment:
+>
+> - If **all green, no open threads** → prompt: _"PR is clean and CI green."_ If labels include `ai:review-stale`, add: _"Run `/review-pr` on the latest commit for a fresh `ai:reviewed`."_ Otherwise: _"Ready for human merge (or run `/review-pr` for first AI pass)."_
+> - If **still failing or open threads** → list remaining items and prompt: _"These need human input."_

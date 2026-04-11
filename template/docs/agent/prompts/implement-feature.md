@@ -1,76 +1,144 @@
-# Implement feature
+# Implement Feature
 
 Use when a **spec (or equivalent) exists and is clear and approved** per team rules — you are ready to write code.
 
-## When to use
+## When to Use This Prompt
 
-| Situation | Action |
-|-----------|--------|
-| Spec ready and approved | **this prompt** |
-| Spec missing, ambiguous, or incomplete | **update-docs** first |
-| Undocumented edge cases appear | **update-docs** — pause implementation |
-| Unsure if a spec exists | **update-docs** or ask |
+| Situation                                        | Use                                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| Spec is approved, ready to code                  | **this prompt**                                                  |
+| Spec is missing, ambiguous, or incomplete        | [update-docs.md](update-docs.md) first                           |
+| Implementation reveals an undocumented edge case | [update-docs.md](update-docs.md) — stop coding, fix docs, resume |
+| You are unsure whether a spec exists             | [update-docs.md](update-docs.md) to create one                   |
 
-Typical sequence: **update-docs** → **implement-feature**.
+These two prompts are sequential: **update-docs → implement-feature**. You should rarely reach this prompt without having run `update-docs.md` first.
 
-## Reading order
+## Required Reading (in order)
 
-0. **Project doc index** — feature registry, paths in `manifest.yaml`
-1. **[values.md](../values.md)**
-2. **[context-policy.md](../context-policy.md)**
-3. **Spec** (`get_spec` / files under `docs/features/`)
-4. **[architecture-primer.md](../architecture-primer.md)** if the module is new to you
+0. **App's docs README** — feature register, prompt navigation (path in app-config.md § Paths)
+1. **[Intent Engineering Standard](../values.md)** — agent principles & workflow (MUST READ FIRST)
+2. **[Context policy](../context-policy.md)** — L0/L1/L2: load only docs this task needs
+3. **Design doc** for this feature (find via app's feature register)
+4. **Related domain docs** if working with domain entities (path in app-config.md § Paths)
+5. **App's architecture-primer.md** if unfamiliar with stack (L2)
 
-> **Toolshed MCP**: `list_registry` → `get_spec`, `lookup_glossary`, `get_rules`.
+> **MCP Toolshed**: If available (check app-config.md § MCP Toolshed), use `get_spec` / `get_feature_doc` / `lookup_glossary` instead of manually opening files.
 
-## Pre-implementation checklist
+## Pre-Implementation Checklist
 
-- [ ] Intent and non-goals clear
-- [ ] Acceptance criteria and failure states known
-- [ ] Security / data boundaries clear
-- [ ] Ambiguity documented or resolved
+Before starting, verify:
 
-## Process
+- [ ] I have read [values.md](../values.md) in full
+- [ ] I have identified the relevant design doc
+- [ ] I have a spec with explicit intent extracted (or created one)
+- [ ] All unknowns are documented or clarified
+- [ ] Security boundaries are clear from the spec
+- [ ] I know what NOT to do (non-goals are specified)
+- [ ] Data inputs/outputs are explicitly defined
+- [ ] Failure states are documented
+- [ ] If MCP Toolshed is available: loaded the active spec (or consciously read the spec file)
+- [ ] If touching known high-risk areas: read the relevant section of app's `key-learnings.md`
 
-1. Extract explicit intent from the spec (objective, constraints, non-goals, I/O, failures, security, acceptance).
-2. If critical fields are empty: **stop** and clarify or run **update-docs**.
-3. Plan implementation (brief plan in PR description is fine).
-4. Implement per repo standards (`rules.standards`, linter, tests).
-5. Run relevant tests.
-6. Open PR with traceability to the spec and risk notes (per `values.md`).
+## Implementation Process
 
-## Intent template (internal)
+Follow [Standard Agent Execution Flow](../values.md#standard-agent-execution-flow):
 
-Use to avoid missing fields; align with your spec template.
+1. **Parse Design Doc** — extract explicit requirements
+2. **Extract Explicit Intent** — use [Intent Extraction Template](../values.md#intent-extraction-template-internal-agent-step)
+3. **Identify Unknowns** — list anything ambiguous
+4. **Halt if ambiguity > threshold** — request clarification, don't guess
+5. **Generate Implementation Plan** — document in spec or PR description
+6. **Validate against**:
+   - Acceptance criteria
+   - Security boundaries
+   - Non-goals
+7. **Implement** — follow code standards from CLAUDE.md and project standards
+8. **Run tests** — verify against acceptance criteria
+9. **Open PR** — include intent mapping, risk assessment
+
+## Intent Extraction Template
+
+From [Intent Extraction Template](../values.md#intent-extraction-template-internal-agent-step):
 
 ```
-Objective:
-Constraints:
-Non-goals:
-Data inputs:
-Data outputs:
-Failure states:
-Security boundaries:
-Acceptance criteria:
+Objective: [What is the goal?]
+Constraints: [What limits exist?]
+Non-goals: [What should NOT be done?]
+Data inputs: [What data comes in?]
+Data outputs: [What data goes out?]
+Failure states: [How can this fail?]
+Security boundaries: [What security considerations?]
+Acceptance criteria: [How do we know it's done?]
 ```
 
-## If the spec must change
+If any field is empty → request clarification, do not proceed.
 
-Do not “fix” the spec only in code. Typical workflow:
+## Anti-Patterns to Avoid
 
-1. Stop implementation
-2. PR or doc update with rationale and impact
-3. Team approval
-4. Resume on updated spec
+From [Anti-Patterns](../values.md#anti-patterns):
 
-## After implementation
+- **Implicit Requirements** — "Obviously it should..." → If obvious, it belongs in spec
+- **Spec Drift** — code implements behavior not documented
+- **Silent Refactoring** — don't rename/reorganize without explicit intent
+- **Over-Broad Security Assumptions** — never assume input is trusted
+- **Completion Bias** — finishing ≠ success. Success = spec alignment + tests + no security regression
 
-Tests green → **finish**. Substantial changes → **full-review** in a **new** thread.
+## If Implementation Reveals Spec Issues
 
-## PR
+Follow [Spec Update Workflow](../values.md#spec-update-workflow):
 
-Template from `values.md` or internal convention. For handoff to review, paste a clear block: **Intent**, **Spec traceability**, **Assumptions** (if any remain unresolved, run **update-docs** before merge).
+1. **Stop implementation**
+2. **Open Spec PR** with:
+   - Explicit change summary
+   - Rationale
+   - Impact analysis
+3. **Await approval**
+4. **Resume implementation** against updated spec
+
+Do NOT silently "fix" the spec in code.
+
+## Post-Implementation: Finish
+
+After implementation is complete and tests pass, run **`/finish`** — the pre-push gate that reviews code, validates, aligns docs, and captures learnings.
+
+> **Agent instruction**: When implementation is complete and tests pass, prompt the user: _"Implementation complete. Run `/finish` to review, validate, and align docs before pushing?"_
+
+For non-trivial changes, also run **`/full-review`** in a **NEW conversation** — fresh context catches spec drift and silent assumptions the implementer internalized.
+
+## PR Template
+
+Use the template from [values.md PR Structure Standard](../values.md#pr-structure-standard). Omit the "Root Cause" section (that's for bug-fix PRs only).
+
+### Chain to review (structured I/O)
+
+When opening a **new** conversation for `/review-pr`, paste **`## Intent`**, **`## Spec Traceability`**, and **`## Assumptions`** (if non-empty) inside a delimited block:
+
+```text
+<handoff_from_implementation>
+(paste ## Intent, ## Spec Traceability, ## Assumptions here)
+</handoff_from_implementation>
+```
+
+> If **Assumptions** has unresolved entries, stop and use [update-docs.md](update-docs.md) before merging.
 
 ## Remember
 
-Agents execute explicit intent: product goal → technical intent → plan → code.
+> **Intent Precedes Implementation** ([values.md](../values.md#intent-precedes-implementation))
+>
+> Agents do not implement features. Agents execute explicit intent specifications.
+>
+> All work must trace: Business Goal → Product Intent → Technical Intent → Executable Plan → Code
+
+> **Quality Is Not Optional** ([values.md](../values.md#quality-is-not-optional))
+>
+> Tests, stories, documentation, and review fixes are part of the work — not follow-up. If the scope is too large to do properly, reduce the scope, not the quality.
+
+---
+
+**Operating Philosophy** ([values.md](../values.md#operating-philosophy)):
+
+- Lower entropy
+- Higher traceability
+- Reduced hallucination
+- Security invariance
+- Spec-driven development

@@ -1,75 +1,126 @@
-# UI test
+# UI Test Prompt
 
-Verify UI behavior after changes to interface, forms, navigation, or data display.
+Use this prompt to verify UI behavior via browser automation after implementing or fixing UI-facing features.
 
-## When to use
+## When to Use
 
-- After implementing or fixing UI-facing behavior
-- When API tests pass but you need end-to-end browser confirmation
-- When asked to verify visually or with guided manual checks
+- After implementing filters, forms, navigation, or data display changes
+- After fixing UI bugs — verify the fix visually
+- When API integration tests pass but you want end-to-end UI confirmation
+- When the user asks to "verify in the browser" or "test the UI"
 
-**Avoid** for: backend-only unit tests, API-only changes without UI, or when the local app cannot run.
+**Don't use for**: unit tests, API-only changes, or when dev server isn't running.
 
-## Reading
+## Required Reading (in order)
 
-1. **[values.md](../values.md)**
-2. **Spec** for the area (acceptance and UI states)
-3. This prompt
+1. **[Intent Engineering Standard](../values.md)** — agent principles (MUST READ FIRST)
+2. **Related feature spec** for the area being tested (find via app's feature register)
+3. **This prompt** — workflow and tool reference
 
-## Prerequisites
+## Prerequisites Checklist
 
-- [ ] Dev server or preview URL (per README)
-- [ ] Browser automation tools available **if** using browser MCP (exact tool names depend on the client)
-- [ ] Test data / seeds if required
-- [ ] A test plan derived from the spec
+Before starting, verify:
+
+- [ ] Dev server is running (start per app-config.md)
+- [ ] Browser automation MCP is available (e.g. Playwright MCP tools are loaded)
+- [ ] Test data is seeded (local dev environment has expected data)
+- [ ] I know what behavior to verify (from spec or implementation)
 
 ## Process
 
-### 1. Test plan
+### Step 1: Define Test Plan
 
-Before clicking, table action → expected:
+Create a table before testing:
 
 ```markdown
-| # | Action | Expected |
-|---|--------|----------|
-| 1 | … | … |
+| Test     | Action                                    | Expected            |
+| -------- | ----------------------------------------- | ------------------- |
+| Baseline | Navigate to page, no filters              | Shows all N results |
+| Filter A | Apply filter X with value Y               | Shows M results     |
+| Filter B | Apply same filter with out-of-range value | Shows 0 results     |
 ```
 
-### 2. Navigation and waits
+### Step 2: Navigate and Wait
 
-Open URL, wait for load (network/async). Take a fresh snapshot after meaningful DOM changes.
+```
+browser_navigate → target URL
+browser_wait_for → time: 3 (let page render)
+```
 
-### 3. Snapshot / accessibility tree
+Pages need time to load data. Always wait after navigation.
 
-If the tool exposes an accessibility tree with element refs, snapshot before each interaction (refs change after navigation or large re-renders).
+### Step 3: Take Snapshot
 
-### 4. Interaction
+```
+browser_snapshot
+```
 
-Click, type, select per plan; between complex steps, new snapshot if the DOM changes.
+This returns the page's accessibility tree with `ref` attributes for every interactive element. You need these refs to interact with elements.
 
-### 5. Verification
+**Key**: Element refs change after every navigation or major page update. Always re-snapshot before interacting.
 
-Visible text, counts, empty/error states, URL query params if state is serialized there.
+### Step 4: Interact
 
-### 6. Screenshots (optional)
+Use refs from the snapshot to interact:
 
-Capture at key steps for PR or issue evidence.
+```
+browser_click → ref from snapshot (buttons, tabs, rows)
+browser_type → ref + text (fill input fields)
+browser_select_option → ref + value (dropdowns)
+```
 
-### 7. Report
+For multi-step interactions, snapshot between steps if the DOM changes.
 
-Table: case | expected | actual | PASS/FAIL.
+### Step 5: Verify
 
-## Tool reference (generic)
+After interaction, check the snapshot or page content for:
 
-Exact names depend on the configured browser MCP. Typical families: navigate, wait, snapshot, click, type, select_option, screenshot, fill_form.
+- Row counts ("Showing X of Y")
+- "No data" messages
+- Specific cell values in data grids
+- Active filter badges with counts
+- URL query parameters (filter state is serialized in URL)
 
-## Anti-patterns
+### Step 6: Screenshot
 
-- Reusing stale element refs after navigation
-- Skipping waits on async loads
-- Verifying without a plan (post-hoc)
-- Ignoring URL state when the feature uses it for filters or navigation
+```
+browser_take_screenshot → filename: descriptive-name.png
+```
+
+Take screenshots at key verification points for evidence.
+
+### Step 7: Report Results
+
+```markdown
+| Test              | Expected  | Actual  | Result |
+| ----------------- | --------- | ------- | ------ |
+| Baseline          | 3 results | 3 of 3  | PASS   |
+| Filter applied    | 2 results | 2 of 2  | PASS   |
+| Out of range      | 0 results | No data | PASS   |
+```
+
+## MCP Tools Reference
+
+| Tool                      | Purpose                    | When                                     |
+| ------------------------- | -------------------------- | ---------------------------------------- |
+| `browser_navigate`        | Go to URL                  | Start of test, page changes              |
+| `browser_wait_for`        | Wait for text or time      | After navigation, before interaction     |
+| `browser_snapshot`        | Get element tree with refs | Before any click/type, after DOM changes |
+| `browser_click`           | Click element by ref       | Buttons, tabs, rows, filter chips        |
+| `browser_type`            | Fill text input by ref     | Search boxes, filter value inputs        |
+| `browser_select_option`   | Select dropdown option     | Operator dropdowns, comboboxes           |
+| `browser_take_screenshot` | Capture viewport           | Evidence at verification points          |
+| `browser_fill_form`       | Fill multiple fields       | Complex forms with several inputs        |
+
+## Anti-Patterns
+
+- **Don't reuse stale refs** — element refs change after navigation or DOM updates; always re-snapshot
+- **Don't skip waiting** — pages load data asynchronously; wait after navigation
+- **Don't test without a plan** — define expected results before interacting, not after
+- **Don't ignore URL state** — filter/form state is often serialized in query params; check the URL to understand what the frontend sends
 
 ## Remember
 
-A green API test does not guarantee the client sends or displays data correctly. UI integrates contracts and state.
+> **Correctness > Completion** ([values.md](../values.md#correctness--completion))
+>
+> UI verification catches integration issues that unit tests miss. A passing API test doesn't guarantee the frontend sends the right format.

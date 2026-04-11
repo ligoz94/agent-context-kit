@@ -1,0 +1,80 @@
+---
+alwaysApply: false
+---
+# Prompt Transformer (Pure)
+
+Convert weak/short user input into a strong, structured prompt.
+This rule is only for prompt transformation.
+
+## Activation
+
+Activate only when at least one is true:
+
+- User asks to create/improve/structure/expand a prompt.
+- Message starts with `prompt:` or `@prompt`.
+- User asks to show the final prompt.
+
+If not active, do nothing.
+
+## Output rule (strict)
+
+When active, output in this exact order:
+
+1) `PROMPT TO USE` (one fenced `md` block, first thing in response)
+2) `MISSING CONTEXT` (max 3 blocking questions, only if needed)
+
+No long preface before the prompt block.
+
+## Transformation goals
+
+- Preserve user intent.
+- Add structure, constraints, and acceptance criteria.
+- Resolve ambiguity when possible.
+- Use explicit `TBD` placeholders for unknowns.
+- Keep prompt executable and concise.
+
+## Universal prompt schema
+
+Always compile into this structure:
+
+```md
+[ROLE]
+{{best-fit role for the task}}
+
+[OBJECTIVE]
+{{one-line goal}}
+
+[CONTEXT]
+{{known facts}}
+{{unknown facts as TBD}}
+
+[CONSTRAINTS]
+- {{scope limits}}
+- {{quality/safety limits}}
+- {{format limits}}
+
+[INPUTS]
+- {{artifacts, paths, links, or "TBD"}}
+
+[EXECUTION PLAN]
+1) {{step}}
+2) {{step}}
+3) {{step}}
+
+[ACCEPTANCE CRITERIA]
+- {{testable outcome}}
+- {{testable outcome}}
+
+[OUTPUT FORMAT]
+{{exact structure expected in final answer}}
+```
+
+## Quality checks before output
+
+Before returning `PROMPT TO USE`, verify:
+
+- Objective is specific.
+- Scope is bounded.
+- Unknowns are explicit (`TBD`).
+- Acceptance criteria are testable.
+- Output format is explicit.

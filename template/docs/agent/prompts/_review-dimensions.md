@@ -1,44 +1,47 @@
-# Shared review dimensions
+# Shared Review Dimensions
 
-Checklist shared by [review-pr.md](review-pr.md) and [full-review.md](full-review.md). Edit here only — do not duplicate.
+Shared checklist used by both [review-pr.md](review-pr.md) and [full-review.md](full-review.md). Do not duplicate — edit here.
 
 > **Toolshed**: filenames starting with `_` are omitted from `list_prompts`. Load this fragment via path or `get_prompt` with name `_review-dimensions`.
 
-## Intent alignment
+## Intent Alignment
 
-Against [values.md](../values.md) and the relevant spec:
+From [Intent Precedes Implementation](../values.md#intent-precedes-implementation):
 
 - [ ] All spec requirements implemented
-- [ ] No behavior beyond the spec (spec drift)
-- [ ] Code traces to design/spec (comments or PR description)
+- [ ] No behavior beyond spec (spec drift)
+- [ ] Code traces to design doc/spec sections
 - [ ] Acceptance criteria met
 - [ ] Non-goals respected (nothing out of scope)
 
-**If missing**: request an intent → code map in the PR description.
+**If missing**: Request intent mapping in PR description
 
-## Security boundaries
+## Security Boundaries
 
-Code must NOT:
+From [Security Is Structural](../values.md#security-is-structural-not-advisory):
 
-- [ ] Log sensitive data (tokens, secrets, PII)
+Check code does NOT:
+
+- [ ] Log sensitive data (tokens, keys, PII)
 - [ ] Persist API keys or secrets
-- [ ] Call third parties not authorized by the spec
-- [ ] Expand data access beyond documented boundaries
+- [ ] Make unauthorized third-party calls
+- [ ] Expand data access beyond spec boundary
 - [ ] Assume input is trusted
-- [ ] Skip authentication/authorization where required
+- [ ] Skip authentication/authorization checks
 
-**If violated**: block the PR and request a security review.
+**If violated**: Block PR, request security review
 
-## Code standards
+## Code Standards
 
 Per `rules.standards` in `manifest.yaml`, repo `CLAUDE.md`, and team conventions:
 
-- [ ] Types and lint respected (no unjustified bypasses)
+- [ ] No type coercion or unsafe bypasses — narrow types properly
 - [ ] File layout and naming conventions followed
 - [ ] APIs and parameters consistent with the codebase
 - [ ] Error handling and edge cases match project standards
+- [ ] No logic duplication — if the PR introduces a utility/hook/transform, verify no equivalent already exists
 
-**If violated**: request fixes per documented standards.
+**If violated**: Request fixes per the linked standard
 
 ## Tests
 
@@ -46,24 +49,25 @@ Per `rules.standards` in `manifest.yaml`, repo `CLAUDE.md`, and team conventions
 - [ ] Tests tied to acceptance criteria
 - [ ] Edge cases covered (including failure states from the spec)
 - [ ] Tests run and passing locally / in CI
-- [ ] If using **stories** / **snapshots** / **E2E**: they assert real behavior, not only “does not crash”
+- [ ] If using **stories** / **snapshots** / **E2E**: they assert real behavior, not only "does not crash"
+- [ ] Snapshot or baseline content is realistic (not `null` / sentinel values)
 
-**If insufficient**: request targeted coverage.
+**If insufficient**: Request targeted coverage
 
-## Spec freshness
+## Spec Freshness
 
-- [ ] Module-boundary files (APIs, routes, smart components) link to specs if the team requires traceability comments
-- [ ] Spec acceptance criteria match the code
-- [ ] Behavior beyond the spec has a spec update or a filed issue
+- [ ] Module-boundary files (APIs, routes, smart components, entry points) link to specs if the team requires traceability comments
+- [ ] Referenced specs' acceptance criteria still match the code being changed
+- [ ] If code adds behavior beyond spec, spec update PR is opened or filed as issue
 
-**If stale**: request a spec update alongside the code change.
+**If stale**: Request spec update alongside code change
 
-## Layering (adapt to your stack)
+## Layer Boundaries (adapt to your stack)
 
-If the project defines layers (e.g. domain vs UI, services vs presentation):
+If the project defines layers (e.g. domain vs UI, services vs presentation, handler/service/repository):
 
-- [ ] Pure logic is not unnecessarily tangled with UI frameworks
+- [ ] Pure logic is not unnecessarily tangled with framework / transport concerns
 - [ ] Layer boundaries match [architecture-primer.md](../architecture-primer.md) or equivalent
 - [ ] New files live in the correct package or directory
 
-**If violated**: request realignment with documented architecture.
+**If violated**: Block PR. Request realignment with documented architecture.

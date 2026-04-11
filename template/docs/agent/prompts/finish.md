@@ -1,92 +1,134 @@
-# Finish
+# Finish Prompt
 
-Use after implementation or bugfix when tests pass — **before** push.
+Use after implementation is complete and tests pass — before pushing.
 
-Combines code review, validation, documentation alignment, and learning capture.
+Combines code review, validation, doc alignment, and learning capture into a single pre-push gate.
 
-## When to use
+## When to Use
 
-| Situation | Use |
-|-----------|-----|
-| Feature done via **implement-feature** | **this prompt** |
-| Bugfix done via **fix-bug** | **this prompt** |
-| Closing **fix-pr** loop | usually **skip** — fix-pr already covers push/CI |
-| Reviewing someone else’s work | **review-pr** |
+| Situation                                      | Use                                           |
+| ---------------------------------------------- | --------------------------------------------- |
+| Done coding a feature via `/implement-feature` | **this prompt**                               |
+| Done fixing a bug via `/fix-bug`               | **this prompt**                               |
+| Done fixing PR findings via `/fix-pr`          | skip — `/fix-pr` already validates and pushes |
+| Reviewing someone else's PR                    | use `/review-pr`                              |
 
-## Required reading
+## Required Reading
 
-1. **[values.md](../values.md)** — project principles
-2. **Spec or issue** for the work just completed
-3. **[key-learnings.md](../key-learnings.md)** if the task touches known edge cases
+1. **[Intent Engineering Standard](../values.md)** — principles (already loaded if coming from `/implement-feature` or `/fix-bug`)
+2. **Spec** for the work just completed
 
-> **Toolshed MCP**: `get_spec`, `list_registry`, `get_learnings` instead of opening everything manually.
+> **MCP Toolshed**: If available (check app-config.md § MCP Toolshed), use `get_spec` / `get_feature_doc` / `lookup_glossary` instead of manually opening files.
 
 ## Steps
 
-### 1. Code review
+### 1. Code Review
 
-Review the diff (self-review or checklist):
+Review all changes in this conversation. Check:
 
-- Correctness vs spec
-- Architectural boundaries (dependencies, layering)
-- Completeness: call sites, stale references, dead code
-- Test coverage
+- Correctness against spec
+- Architectural alignment (module boundaries, dependency direction, layer separation)
+- Completeness — stale references, missed call sites, dead code from refactoring
+- Test coverage — sufficient? gaps?
+- Runtime bugs the changes introduce
 
-### 2. Fix blockers
+### 2. Fix Blocking Issues
 
-Resolve blocking findings. Non-blocking: note in PR; do not expand scope.
+Fix all blocking findings from the review. Non-blocking issues: note in PR description, don't fix now.
 
 ### 3. Validation
 
-Run the repo’s canonical commands (README or CI). Example placeholders — **replace** with real ones:
+Run the repo's canonical commands (from README, CLAUDE.md, or CI). Placeholders — **replace** with real ones:
 
 ```bash
-# Example — adapt to your project
-npm run lint
-npm run typecheck   # or equivalent
-npm test
-npm run format:check  # if present
+# Types
+<typecheck-command>
+
+# Lint
+<lint-command>
+
+# Tests
+<test-command>
+
+# Formatting
+<format-check-command>
 ```
 
-### 4. Output verification (not only snapshots)
+Fix any failures. If snapshot updates are needed, verify the content is **correct**, not just consistent — snapshots freeze whatever renders; they don't validate intent.
 
-If the team uses snapshots/stories/visual tests: verify **content** is correct, not only that files updated.
+### 4. Output Verification
 
-Skip if the change is documentation-only.
+Skip this step if the change is docs-only.
 
-### 5. Documentation alignment
+After tests and snapshots pass, verify the output is **correct**, not just **consistent**.
 
-- Feature doc / spec: still accurate?
-- `manifest.yaml` registry / `docs/features/`: status updated if your process requires it?
-- Code comments: stale references?
+**UI changes — stories or visual tests:**
 
-Small fixes here; large doc rewrites → issue or follow-up **update-docs**.
+1. Confirm a story variant exercises the specific behavior you changed (a `Default` story showing empty/fallback state is not sufficient for verifying a fix)
+2. After generating snapshot baselines, verify rendered content is correct
+3. If the rendered output is wrong — fix the component or mock data, don't just update the snapshot
 
-### 6. Key learnings
+**API changes — controller/handler tests:**
 
-If you discovered non-obvious constraints, consider an entry in [key-learnings.md](../key-learnings.md) using the file’s existing format.
+1. Confirm a test covers the changed endpoint/handler
+2. After updating test snapshots, verify the response shape and values are correct
+3. Check that new fields appear with realistic values, not `null` or placeholder data
+
+### 5. Doc Alignment
+
+Search for documentation now out of sync with code changes. Check:
+
+- **Feature doc** — does it still describe current behavior?
+- **Spec** — update acceptance criteria checkboxes to match what was built
+- **Feature register** — update status if feature moved to Implemented/Partially Implemented
+- **Domain docs** — if domain concepts changed
+- **Backend docs** — if API shape or entity fields changed
+- **Code comments** in changed and related files — stale references?
+
+Update stale references to match the implementation. Small fixes only — if doc changes are large, note them for a follow-up `/update-docs`.
+
+### 6. Key Learnings
+
+If the work revealed non-obvious behavior (gotchas, data model quirks, pattern choices that weren't apparent from reading code), consider adding to the app's key-learnings.md.
+
+Criteria for inclusion — would an agent implementing something new in this area hit the same problem?
+
+- What was the root cause or non-obvious constraint?
+- What pattern prevents it?
+- Is it generalizable beyond this one task?
+
+If yes, add an entry following the existing format in key-learnings.md.
 
 ### 7. Summary
 
-```
-## Finish summary
+Output a brief summary:
 
-**Review**: [n] findings — [n] fixed, [n] deferred to PR
-**Validation**: lint / types / tests / format
+```
+## Finish Summary
+
+**Review**: [n] findings — [n] fixed, [n] noted for PR
+**Validation**: types / lint / tests / format
 **Output verification**: verified | skipped (docs-only) | N/A
-**Docs updated**: [list or "none"]
-**Learnings**: [entry title or "none"]
+**Docs updated**: [list of files, or "none"]
+**Key learnings**: [added entry title, or "none"]
 **Ready to push**: yes | no — [blockers]
 ```
 
-## Next step (agent instruction)
+## Next Step
 
-- If **Ready to push: yes** → ask whether to commit/push and run review in a new thread.
-- If **no** → list blockers; re-run **finish** after fixes.
+> **Agent instruction**: After outputting the finish summary:
+>
+> - If **Ready to push: yes** → commit, push, and reset AI review status:
+>   ```bash
+>   gh pr edit <number> --remove-label "ai:reviewing,ai:reviewed,ai:changes-requested,ai:review-stale" --add-label "ai:not-reviewed"
+>   ```
+>   Then prompt: _"Pushed and labeled `ai:not-reviewed`. Run `/review-pr` in a new conversation?"_
+> - If **Ready to push: no** → list blockers and prompt: _"Fix these blockers, then re-run `/finish`."_
 
-## Anti-patterns
+## Anti-Patterns
 
-- Scope creep beyond review and docs tied to the change
-- Skipping local CI-equivalent commands
-- Updating docs unrelated to the work
-- Learnings for obvious facts
+- **Scope creep** — fix review findings and stale docs, nothing else
+- **Skipping validation** — "it worked when I tested manually" is not sufficient
+- **Updating docs you didn't affect** — only sync docs related to your changes
+- **Adding key learnings for obvious things** — only non-obvious, non-derivable-from-code facts
+- **Blocking on non-blocking findings** — note them, move on

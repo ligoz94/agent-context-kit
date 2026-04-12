@@ -40,6 +40,11 @@ const BaseManifest = z.object({
       dir: z.string().optional(),
     })
     .optional(),
+  templates: z
+    .object({
+      dir: z.string().optional(),
+    })
+    .optional(),
   toolshed: z
     .object({
       tool_aliases: z.record(z.string(), z.string()).optional(),

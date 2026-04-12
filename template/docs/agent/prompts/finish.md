@@ -17,20 +17,21 @@ Combines code review, validation, doc alignment, and learning capture into a sin
 
 1. **[Intent Engineering Standard](../values.md)** — principles (already loaded if coming from `/implement-feature` or `/fix-bug`)
 2. **Spec** for the work just completed
+3. **[prompts/\_review-dimensions.md](_review-dimensions.md)** — the 100-point scoring rubric
 
 > **MCP Toolshed**: If available (check app-config.md § MCP Toolshed), use `get_spec` / `get_feature_doc` / `lookup_glossary` instead of manually opening files.
 
 ## Steps
 
-### 1. Code Review
+### 1. Code Review & Scoring
 
-Review all changes in this conversation. Check:
+Evaluate all uncommitted changes in this conversation using the exact 100-point rubric and 12 dimensions found in **\_review-dimensions.md** against the **Spec**.
 
-- Correctness against spec
-- Architectural alignment (module boundaries, dependency direction, layer separation)
-- Completeness — stale references, missed call sites, dead code from refactoring
-- Test coverage — sufficient? gaps?
-- Runtime bugs the changes introduce
+- Calculate the score strictly applying the `Grade Caps` (if tests are missing, cap at 70, etc.).
+- Treat the current local state as a "Draft PR" against the base architecture.
+- If the score is < 90/100, the build is considered **BLOCKED**.
+
+Output a brief table of the dimensions that lost points, and the final score.
 
 ### 2. Fix Blocking Issues
 
@@ -106,6 +107,7 @@ Output a brief summary:
 ```
 ## Finish Summary
 
+**Self-Scoring**: [Score]/100
 **Review**: [n] findings — [n] fixed, [n] noted for PR
 **Validation**: types / lint / tests / format
 **Output verification**: verified | skipped (docs-only) | N/A

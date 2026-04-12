@@ -37,6 +37,10 @@ import {
   handleGetGuardrails,
   handleRequestHumanApproval,
   handleVerifyAction,
+  handleValidateAgentReport,
+  handleGetTemplate,
+  handleListTemplates,
+  handleAnalyzeSpecCompleteness,
   toolName,
 } from "./handlers.js";
 
@@ -257,6 +261,48 @@ mcp.registerTool(
     inputSchema: emptyArgs
   },
   async () => handleValidateContext(manifest, root)
+);
+
+mcp.registerTool(
+  toolName(manifest, "get_template"),
+  {
+    description: "Returns a named template (e.g. pr-body, commit-message) from the templates directory.",
+    inputSchema: z.object({
+      name: z.string().optional().describe("Template filename without .md extension"),
+    }),
+  },
+  async (input) => handleGetTemplate(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "list_templates"),
+  {
+    description: "Lists all available templates.",
+    inputSchema: emptyArgs,
+  },
+  async () => handleListTemplates(manifest, root),
+);
+
+mcp.registerTool(
+  toolName(manifest, "validate_agent_report"),
+  {
+    description: "Validates if a Pull Request description text adheres to the strict PNA Agent Report and Identification standard. You should pass the entire PR description string to this tool.",
+    inputSchema: z.object({
+      pr_body: z.string().describe("The full Markdown content of the PR description.")
+    }),
+  },
+  async (input) => handleValidateAgentReport(input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "analyze_spec_completeness"),
+  {
+    description: "Analyzes a local markdown file containing a specification to ensure it possesses all 8 necessary Intent Engineering categories before starting an implementation.",
+    inputSchema: z.object({
+      path: z.string().describe("The relative path to the Markdown file.")
+    }),
+  },
+  async (input) => handleAnalyzeSpecCompleteness(root, input),
 );
 
 mcp.registerTool(

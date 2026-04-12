@@ -30,7 +30,7 @@ Open **only** what the task needs:
 | Triage all issues | [prompts/triage-all-issues.md](prompts/triage-all-issues.md) + [prompts/triage-issue.md](prompts/triage-issue.md)                      |
 | Implement feature | [prompts/implement-feature.md](prompts/implement-feature.md) + relevant feature doc + spec(s)                                          |
 | Fix bug           | [prompts/fix-bug.md](prompts/fix-bug.md) + spec + feature doc for affected area                                                        |
-| Finish (pre-push) | [prompts/finish.md](prompts/finish.md) + spec for the work just completed                                                              |
+| Finish (pre-push) | [prompts/finish.md](prompts/finish.md) + [prompts/\_review-dimensions.md](prompts/_review-dimensions.md) + spec for the work just completed |
 | Review PR         | [prompts/review-pr.md](prompts/review-pr.md) + [prompts/\_review-dimensions.md](prompts/_review-dimensions.md) + spec                  |
 | Full review       | [prompts/full-review.md](prompts/full-review.md) + [prompts/\_review-dimensions.md](prompts/_review-dimensions.md) + spec + design doc |
 | Review API        | App's `review-api.md` (if exists) + app's backend architecture doc                                                                     |

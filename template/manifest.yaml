@@ -53,6 +53,11 @@ registry: []
 prompts:
   dir: docs/agent/prompts/
 
+# ── Templates ────────────────────────────────────────────────────────────────
+# Canonical system templates for PR bodies, commit messages, and spec updates.
+templates:
+  dir: docs/agent/templates/
+
 # ── Toolshed server config ───────────────────────────────────────────────────
 toolshed:
   port: 3742

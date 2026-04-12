@@ -319,8 +319,100 @@ export function handleValidateContext(manifest: Manifest, root: string): ToolRes
   
   (manifest?.registry as any || []).forEach((r: any) => check(r.path));
   
+  if (manifest?.templates) {
+    const templates = manifest.templates as any;
+    check(templates?.dir ?? "docs/agent/templates");
+  }
+  
   if (missing.length === 0) return ok("All context files are present and valid.");
-  return err(`Missing context files:\n${missing.map(m => `- ${m}`).join("\n")}`);
+  return err(`Missing context files or directories:\n${missing.map(m => `- ${m}`).join("\n")}`);
+}
+
+export function handleGetTemplate(
+  manifest: Manifest,
+  root: string,
+  input: { name?: string },
+): ToolResult {
+  const templates = manifest?.templates as any;
+  const dir = templates?.dir ?? "docs/agent/templates";
+  let content = readFile(root, join(dir, `${input?.name}.md`));
+  if (!content) return err(`Template "${input?.name}" not found in ${dir}`);
+  
+  return ok(content);
+}
+
+export function handleListTemplates(manifest: Manifest, root: string): ToolResult {
+  const templates = manifest?.templates as any;
+  const dir = templates?.dir ?? "docs/agent/templates";
+  const files = readDir(root, dir);
+  const names = Object.keys(files);
+  if (names.length === 0) return ok(`No templates found in ${dir}.`);
+  return ok(`## Available templates\n\n${names.map((n) => `- ${n}`).join("\n")}`);
+}
+
+export function handleValidateAgentReport(input: { pr_body?: string }): ToolResult {
+  if (!input.pr_body) return err("pr_body is required.");
+  
+  const text = input.pr_body;
+  const missing: string[] = [];
+  
+  const reportRegexes = [
+    { name: "Clarifications requested", regex: /-\s+\*\*Clarifications requested:\*\*\s+.+/i },
+    { name: "Assumptions made", regex: /-\s+\*\*Assumptions made:\*\*\s+.+/i },
+    { name: "Spec gaps found", regex: /-\s+\*\*Spec gaps found:\*\*\s+.+/i },
+    { name: "Scope", regex: /-\s+\*\*Scope:\*\*\s+.+/i },
+    { name: "Refusals", regex: /-\s+\*\*Refusals:\*\*\s+.+/i },
+    { name: "Inferences", regex: /-\s+\*\*Inferences:\*\*\s+.+/i },
+    { name: "Context mistakes", regex: /-\s+\*\*Context mistakes:\*\*\s+.+/i },
+  ];
+  
+  for (const r of reportRegexes) {
+    if (!r.regex.test(text)) missing.push(`Missing or incomplete Agent Report field: '${r.name}'`);
+  }
+  
+  const agentIdRegex = /\*\*Agent:\*\*\s+[^·]+·\s+`[^`]+`\s+·\s+effort=(none|low|medium|high|n\/a|unknown)/;
+  if (!agentIdRegex.test(text)) {
+    missing.push("Missing or malformed Agent Identification string (expected format: **Agent:** <tool> · `<model-id>` · effort=<effort>)");
+  }
+  
+  if (missing.length > 0) {
+    return err(`PR Body Validation Failed:\n${missing.map(m => `- ${m}`).join("\n")}`);
+  }
+  
+  return ok("✅ PR Body is valid and conforms to the PNA standards.");
+}
+
+export function handleAnalyzeSpecCompleteness(root: string, input: { path?: string }): ToolResult {
+  if (!input.path) return err("path is required.");
+  
+  const content = readFile(root, input.path);
+  if (!content) return err(`Spec file not found or unreadable: ${input.path}`);
+  
+  const missing: string[] = [];
+  
+  const sections = [
+    "Objective",
+    "Constraints",
+    "Non-goals",
+    "Data inputs",
+    "Data outputs",
+    "Failure states",
+    "Security boundaries",
+    "Acceptance criteria"
+  ];
+  
+  for (const section of sections) {
+    const regex = new RegExp(`(^|\\n)(#+\\s+|\\*\\*)?${section}(:|\\*\\*|\\n|\\s)`, "i");
+    if (!regex.test(content)) {
+      missing.push(section);
+    }
+  }
+  
+  if (missing.length > 0) {
+    return err(`Spec is INCOMPLETE. Missing required intent engineering categories:\n${missing.map(m => `- [ ] ${m}`).join("\n")}`);
+  }
+  
+  return ok(`✅ Spec is complete. All 8 Intent Engineering categories are present.`);
 }
 
 // ── Guardrails Handlers ───────────────────────────────────────────────────────

@@ -26,6 +26,12 @@ rules:
 knowledge:
   learnings: docs/agent/key-learnings.md
 
+prompts:
+  dir: docs/agent/prompts/
+
+templates:
+  dir: docs/agent/templates/
+
 registry:
   - name: user-authentication
     path: docs/features/user-authentication.md

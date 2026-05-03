@@ -44,7 +44,7 @@ From your repository root:
 npx @agent-context-kit/cli init
 ```
 
-This adds `manifest.yaml`, `docs/agent/*`, `docs/features/`, `docs/human/`, `docs/decisions/`, Cursor rules, and `CLAUDE.md`.
+This adds `manifest.yaml`, `docs/agent/*`, `docs/features/`, `docs/human/`, `docs/decisions/`, **`.cursor/rules/*.mdc`**, **`.cursor/hooks.json`** (empty hooks + `hooks/README.md`), and `CLAUDE.md`.
 
 ### 2. Fill in your project
 
@@ -67,7 +67,7 @@ npx @agent-context-kit/toolshed-server
 
 Use `--manifest /path/to/manifest.yaml` if the file is not at the process working directory. Use `--profile <name>` to merge a `profiles.<name>` block from the manifest (e.g. frontend vs backend guardrails).
 
-Full editor setup: after `init`, see `docs/human/toolshed-mcp-setup.md` in your project.
+Full editor setup: after `init`, see `docs/human/toolshed-mcp-setup.md`. For a layered stack (short root memory, few MCPs, path rules, hooks, worktrees) mapped to this kit, see `docs/human/agent-context-power-user-stack.md`.
 
 ### 5. Optional: LangChain
 

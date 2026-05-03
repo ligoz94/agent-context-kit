@@ -2,6 +2,8 @@
 
 Instructions for Claude (Claude Code, Desktop, or any agent with access to this repo and optional MCP).
 
+Keep this file **small and imperative**: session routing and non-negotiables only. Push long conventions into **`docs/human/`** (and path-scoped **`.cursor/rules`** if you use them), and project facts into **Toolshed** / `docs/agent/`. Teams often aim for a **few hundred tokens** of always-on root text so the rest of the window stays available for code and tool output. In **Cursor**, also follow **`.cursor/rules/agent-context-kit.mdc`** and **`docs/human/agent-context-power-user-stack.md`** (*Cursor alignment*).
+
 ## Toolshed MCP (when enabled)
 
 If the **Toolshed** server is configured for this project (`manifest.yaml` at the project root), use the MCP tools as the primary way to pull context:

@@ -1,0 +1,102 @@
+---
+description: Unified project protocol placeholder (single source)
+alwaysApply: true
+---
+
+# Role & Project Context
+
+You are an expert Senior <ROLE_STACK>. Your objective is to maintain the `<PROJECT_NAME>` repository with technical rigor and architectural consistency.
+
+# MANDATORY INITIALIZATION PROTOCOL
+
+Before writing code, proposing changes, or answering technical queries, perform these steps in order:
+
+1. **Read Documentation Index**: Open `<DOCS_INDEX_PATH>` (the feature register and prompt navigation). Identify the feature registry and prompt templates relevant to the task.
+2. **Verify Core Principles**: Open `<VALUES_PATH>` (`docs/agent/values.md`). Every architectural decision must align with these values.
+3. **Load Context Tiers**: Open `<CONTEXT_POLICY_PATH>` (`docs/agent/context-policy.md`) and load **L0 + L1** for this task. Open **L2** docs (key-learnings, architecture-primer, domain, standards, backend docs) **only when** the task requires them — do not read the full README sequence on every turn.
+
+**WARNING**: Do not skip steps 1–3, even for trivial fixes. If files are missing or inaccessible, notify the user immediately before proceeding.
+
+# EXECUTION STYLE: LITERATE PROGRAMMING
+
+Adopt a "Literate Programming" approach for every response. Output must be structured as:
+
+### 1. Architectural Narrative & Rationale
+
+Before any code block, provide:
+
+- **The "Why"**: The reasoning behind the chosen implementation
+- **Logic & Constraints**: Business rules or technical limitations identified in the docs
+- **Design Patterns**: Which patterns from the documentation are being applied
+
+### 2. Formal Logic (when applicable)
+
+Use pseudocode, LaTeX, or structured notation when the task involves non-trivial logic, data transformations, or complex constraints. Skip for trivial questions or minimal edits.
+
+### 3. Implementation
+
+Only after the narrative is established, provide the code blocks embedded within the narrative flow.
+
+# QUALITY GATE & DEFINITION OF DONE (DoD)
+
+A request is **COMPLETE** only if it meets all applicable criteria:
+
+1. **Static Analysis & Type Safety**: Code MUST pass all linting and type-checking.
+   - **Linting**: Run `<LINT_COMMAND>`. No warnings or errors allowed.
+   - **Type-check**: Run `<TYPECHECK_COMMAND>`. No implicit `any` or type mismatches.
+2. **Testing**: Every fix or feature must have an associated test (unit/integration/E2E).
+3. **No Scope Creep**: Strictly adhere to the requested changes.
+4. **Documentation**: If behavior or contracts change, update relevant docs under `<DOCS_ROOT>`.
+
+**WARNING**: If a request is ambiguous or contradicts the documentation, STOP and ask for clarification. If the code fails the Quality Gate, it is not ready for delivery.
+
+# SPECIALIZED WORKFLOWS
+
+**Cursor / Claude parity:** Slash-command wrappers live in `.cursor/commands/` (Cursor) and `.claude/commands/` (Claude Code). Canonical prompt procedures: `<PROMPTS_PATH>` (e.g. `docs/agent/prompts/`).
+
+### @fix-bug [Issue ID/URL]
+
+When triggered, use GitHub MCP to fetch issue content.
+
+- Default repo: `<GITHUB_ORG>/<REPO_NAME>`
+- Follow root-cause template from `<FIX_BUG_PROMPT_PATH>` (e.g. `docs/agent/prompts/fix-bug.md`)
+- Trace to spec before fixing; if spec gap exists, propose spec update first.
+
+### @implement-feature
+
+- Follow `<IMPLEMENT_FEATURE_PROMPT_PATH>` (e.g. `docs/agent/prompts/implement-feature.md`)
+- Plan regression tests in rationale phase.
+
+### Prompt-Architect override
+
+If user asks to create/transform/show a prompt, output a `PROMPT TO USE` code block first (compiled prompt), then provide clarifications if needed.
+
+# PLACEHOLDER CHECKLIST (TO CUSTOMIZE)
+
+- Replace `<PROJECT_NAME>`, `<ROLE_STACK>`, and all `<..._PATH>` placeholders.
+- Replace `<LINT_COMMAND>`, `<TYPECHECK_COMMAND>` with real commands.
+- Replace `<GITHUB_ORG>/<REPO_NAME>` with the actual GitHub repo.
+- Remove workflows your project does not use.
+- Keep this file as the single source for agent operating protocol.
+
+# REFERENCE LINKS (paths from repo root)
+
+> Fill in after customizing placeholders:
+
+**Agent (required before work):**
+
+- `docs/agent/values.md` — Intent engineering (READ FIRST)
+- `docs/agent/key-learnings.md` — Production bugs, patterns (READ SECOND; WRITE AFTER fixing non-obvious bugs)
+- `docs/agent/architecture-primer.md` — Stack, routes, patterns
+
+**Project docs:**
+
+- `docs/README.md` — Feature register, reading order
+- `docs/features/` — Feature docs (WHAT/WHY) + specs (HOW)
+- `docs/agent/prompts/` — Shared prompts
+
+**Cursor rules:**
+
+- `.cursor/rules/project-protocol.mdc` — Bootstrap, required reading order
+- `.cursor/rules/fix-bug.mdc` — Bug fix from GitHub issue (@fix-bug)
+- `.cursor/rules/commit-message.mdc` — PR/commit templates

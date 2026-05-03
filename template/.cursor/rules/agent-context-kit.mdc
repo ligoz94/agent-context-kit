@@ -5,7 +5,15 @@ alwaysApply: true
 
 # agent-context-kit workflow
 
-This project uses **agent-context-kit**: layered docs under `docs/agent/` plus an optional **Toolshed** MCP server (`manifest.yaml`). Follow this every session.
+This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/agent/` plus an optional **Toolshed** MCP server (`manifest.yaml`). Follow this every session.
+
+## Cursor alignment (same stack as “power user” write-ups)
+
+- **Keep ambient context small:** short imperative [`CLAUDE.md`](../../CLAUDE.md); long standards live in `docs/human/` and load via Toolshed `get_rules` or path-scoped rules — see **`docs/human/agent-context-power-user-stack.md`** (*Cursor alignment*). **In the agent-context-kit monorepo** (no `docs/human/` at repo root), use **`template/docs/human/agent-context-power-user-stack.md`**.
+- **Path-scoped rules:** add `.cursor/rules/*.mdc` with **`globs`** and **`alwaysApply: false`** for directory-specific conventions; keep **`alwaysApply: true`** only for repo-wide workflows (like this file).
+- **Plan before risky work:** use **Cursor Plan mode** ([docs](https://www.cursor.com/docs/agent/modes)) for multi-file or high-uncertainty tasks; align plans with `docs/agent/context-policy.md` (L1/L2).
+- **Few MCP servers:** Cursor **Settings → MCP** — prefer Toolshed plus a small set of justified servers (each adds tool schemas to context).
+- **Hooks (optional):** [Cursor Hooks](https://docs.cursor.com/agent/hooks) — **`.cursor/hooks.json`** (created by **`context-kit init`**, starts with an empty `hooks` object) and **`.cursor/hooks/README.md`**; add scripts under **`.cursor/hooks/`** when needed. Pair with `manifest.yaml` **guardrails** and Toolshed approval tools where configured.
 
 ## If Toolshed MCP is connected
 

@@ -20,6 +20,10 @@ Before code or architectural commitment:
 
 Optional one-liner in the reply: which L1/L2 paths you will open next.
 
+### Root memory (`CLAUDE.md`)
+
+`CLAUDE.md` at the repo root is usually loaded **every session** in Claude-oriented flows, so it behaves like a **hot cache**: long prose here burns context on every turn. Prefer **short, imperative** lines (commands and gates that change behavior) over vague advice. Target on the order of **under ~500 tokens** of always-on instructions; keep line count modest (many teams stay **well under ~200 lines**). Deep standards belong in **`docs/human/`** (and optional path-scoped editor rules), not in an ever-growing root file. See `docs/human/agent-context-power-user-stack.md`.
+
 ## L1 — Just-in-time (per task)
 
 Open **only** what the task needs:

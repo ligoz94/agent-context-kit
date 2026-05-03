@@ -53,6 +53,18 @@ Alternatives: `npm link` inside `packages/toolshed-server` then `"command": "too
 2. **Optional: custom manifest path** — add `--manifest /absolute/or/relative/path/to/manifest.yaml` if the file is not named `manifest.yaml` or not at the repo root.
 3. **Optional: profile** — `--profile <name>` deep-merges `profiles.<name>` from the manifest (e.g. different guardrails per agent).
 
+## How many MCP servers?
+
+Each MCP server exposes **tool definitions** (names, parameters, descriptions). Those definitions usually consume **context on every turn** unless your client supports **lazy tool discovery** (sometimes called tool search). Even with lazy loading, a long server list still adds noise and failure modes.
+
+**Practical guidance:**
+
+- Treat **Toolshed** as your **project context** server (L0/L1/L2 from this kit). It does not replace GitHub, web search, extra filesystem roots, or DB introspection — add those only when needed.
+- Prefer a **small, justified** set of servers (often on the order of a handful). Remove servers you are not actively using.
+- If two servers expose overlapping tools, use **`toolshed.tool_aliases`** (and client-specific renames) to avoid collisions.
+
+For a conceptual map (plan mode, path rules, hooks, worktrees) see **[agent-context-power-user-stack.md](agent-context-power-user-stack.md)**.
+
 ## Claude Desktop
 
 Edit the MCP config file (platform-specific path — see [Anthropic MCP docs](https://modelcontextprotocol.io/quickstart/user)) and add:
@@ -87,6 +99,8 @@ Edit the MCP config file (platform-specific path — see [Anthropic MCP docs](ht
 Paths in `args` are resolved from `cwd`.
 
 ## Cursor
+
+Keep your **enabled MCP server list small** (each server adds tool schemas to context). See [Cursor alignment](agent-context-power-user-stack.md#cursor-alignment) in **agent-context-power-user-stack.md**.
 
 1. Open **Cursor Settings → MCP** (or edit the MCP JSON your workspace uses).
 2. Add a server entry equivalent to:

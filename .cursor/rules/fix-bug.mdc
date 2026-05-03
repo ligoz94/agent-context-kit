@@ -1,0 +1,43 @@
+---
+description: Fix bug from GitHub issue — @fix-bug 42 or @fix-bug https://github.com/owner/repo/issues/42
+alwaysApply: false
+---
+
+# Fix Bug from GitHub Issue
+
+When the user mentions this rule with an issue reference, execute the full fix-bug workflow using the GitHub MCP tool.
+
+**Accepted formats:**
+
+- `@fix-bug 42` → fetch `https://github.com/<GITHUB_ORG>/<REPO_NAME>/issues/42`
+- `@fix-bug https://github.com/owner/repo/issues/42` → fetch that exact URL
+
+## 1. Required Reading (in order)
+
+1. [`docs/README.md`](../../docs/README.md)
+2. [`docs/agent/values.md`](../../docs/agent/values.md)
+3. [`docs/agent/prompts/fix-bug.md`](../../docs/agent/prompts/fix-bug.md)
+4. **GitHub Issue Content**: Use the **GitHub MCP tool** to fetch the issue details.
+   - If only a number `N` is provided, use repo: `<GITHUB_ORG>/<REPO_NAME>` and issue: `N`.
+   - If the fetch fails due to permissions, ask the user to paste the issue content manually.
+
+**Context Retrieval**: After reading the issue, identify the affected feature and read the corresponding spec in `docs/features/` and related domain docs.
+
+## 2. Execution Workflow
+
+1. **Understand** — Analyze symptoms, expected vs actual behavior, and the affected codebase area.
+2. **Classify** — Categorize as Code, Spec, or Design bug (refer to `fix-bug.md`).
+3. **Fix** — Apply the "Bug Fix Process" defined in `fix-bug.md`.
+4. **PR / Documentation** — Generate a Root Cause Analysis using the template in `fix-bug.md`.
+
+## 3. Constraints & Validation
+
+- **No Guessing**: Always trace the bug back to a requirement/spec before coding.
+- **Spec First**: If there's a gap in the specification, propose a spec update before the fix.
+- **Verification**: Add a regression test for every fix.
+- **Focus**: Stay within the scope of the issue; do not perform unrelated refactoring.
+- **MCP Usage**: Prefer MCP tools over web search for GitHub interaction.
+
+## 4. Placeholder Checklist
+
+- Replace `<GITHUB_ORG>/<REPO_NAME>` with the actual GitHub repo.

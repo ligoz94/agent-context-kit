@@ -71,11 +71,24 @@ describe("@agent-context-kit/cli", () => {
       const mockCwd = "/tmp/mock-cwd";
       vi.mocked(fs.existsSync).mockImplementation((p) => {
         if (String(p).includes("manifest.yaml")) return true;
-        if (String(p).includes("values.md")) return false; 
+        if (String(p).includes("values.md")) return false;
         return true;
       });
       const code = cmdCheck(mockCwd);
       expect(code).toBe(1);
+    });
+
+    it("warns when CLAUDE.md exceeds token and line budgets", () => {
+      const mockCwd = "/tmp/mock-cwd";
+      const longLines = Array.from({ length: 210 }, () => "x").join("\n");
+      const longBody = `${longLines}\n${"z".repeat(2400)}`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (String(p).endsWith("CLAUDE.md")) return longBody;
+        return "short";
+      });
+      const code = cmdCheck(mockCwd);
+      expect(code).toBe(0);
     });
   });
 

@@ -6,7 +6,7 @@
  * Commands:
  *   context-kit init     — scaffold docs/agent/ in the current project
  *   context-kit sync     — update engine regions, preserve project regions
- *   context-kit check    — validate manifest, links, token budgets
+ *   context-kit check    — validate manifest, L0 token budgets, optional CLAUDE.md size hints
  *   context-kit list     — list prompts and feature files
  *   context-kit new-spec — scaffold docs/features/<name>.md + registry entry
  */
@@ -156,6 +156,7 @@ export function cmdInit(cwd: string = process.cwd()) {
   ensureDir(join(cwd, "docs/human"));
   ensureDir(join(cwd, "docs/decisions"));
   ensureDir(join(cwd, ".cursor/rules"));
+  ensureDir(join(cwd, ".cursor/hooks"));
 
   for (const f of agentFiles) {
     copyTemplate(join(templateDir, "docs/agent", f), join(cwd, "docs/agent", f));
@@ -184,8 +185,18 @@ export function cmdInit(cwd: string = process.cwd()) {
   );
 
   copyTemplate(
-    join(templateDir, ".cursor/rules/agent-context-kit.mdc"),
-    join(cwd, ".cursor/rules/agent-context-kit.mdc"),
+    join(templateDir, "docs/human/agent-context-power-user-stack.md"),
+    join(cwd, "docs/human/agent-context-power-user-stack.md"),
+  );
+
+  copyTemplateDirFiles(templateDir, ".cursor/rules", cwd);
+  copyTemplate(
+    join(templateDir, ".cursor/hooks.json"),
+    join(cwd, ".cursor/hooks.json"),
+  );
+  copyTemplate(
+    join(templateDir, ".cursor/hooks/README.md"),
+    join(cwd, ".cursor/hooks/README.md"),
   );
   copyTemplate(join(templateDir, "CLAUDE.md"), join(cwd, "CLAUDE.md"));
 
@@ -195,7 +206,13 @@ export function cmdInit(cwd: string = process.cwd()) {
   console.log("  2. Fill docs/agent/values.md with your non-negotiables");
   console.log("  3. Fill docs/agent/glossary.md with your project terms");
   console.log("  4. Wire MCP: docs/human/toolshed-mcp-setup.md");
-  console.log("  5. Run: npx @agent-context-kit/toolshed-server");
+  console.log(
+    "  5. Optional: docs/human/agent-context-power-user-stack.md (layered stack, few MCPs, hooks)",
+  );
+  console.log(
+    "  6. Cursor: .cursor/rules/*.mdc + .cursor/hooks.json (empty hooks — see .cursor/hooks/README.md)",
+  );
+  console.log("  7. Run: npx @agent-context-kit/toolshed-server");
 }
 
 export function cmdSync(cwd: string = process.cwd()) {
@@ -287,6 +304,32 @@ export function cmdCheck(cwd: string = process.cwd()): number {
       }
     } catch (e) {
       warn(`Cannot read ${f} for token check: ${(e as Error).message}`);
+    }
+  }
+
+  const claudePath = join(cwd, "CLAUDE.md");
+  const CLAUDE_TOKEN_WARN = 500;
+  const CLAUDE_LINE_WARN = 200;
+  if (existsSync(claudePath)) {
+    try {
+      const claudeRaw = readFileSync(claudePath, "utf8");
+      const claudeTokens = Math.round(claudeRaw.length / 4);
+      const lineCount = claudeRaw.split(/\r?\n/).length;
+      if (claudeTokens > CLAUDE_TOKEN_WARN) {
+        warn(
+          `CLAUDE.md is ~${claudeTokens} tokens (keep root memory short; target often < ~${CLAUDE_TOKEN_WARN}). See docs/human/agent-context-power-user-stack.md`,
+        );
+        warnings++;
+      }
+      if (lineCount > CLAUDE_LINE_WARN) {
+        warn(
+          `CLAUDE.md has ${lineCount} lines (consider trimming; many teams stay under ~${CLAUDE_LINE_WARN}).`,
+        );
+        warnings++;
+      }
+      ok("CLAUDE.md");
+    } catch (e) {
+      warn(`Cannot read CLAUDE.md for size check: ${(e as Error).message}`);
     }
   }
 
@@ -390,7 +433,7 @@ export function cmdHelp() {
   Commands:
     init              Scaffold docs/agent/ structure in this project
     sync              Update engine regions in existing files
-    check             Validate manifest and check required files
+    check             Validate required files, L0 token hints, CLAUDE.md size hints
     list              List available prompts and features
     new-spec <name>   Scaffold a new feature spec and add it to the manifest registry
 

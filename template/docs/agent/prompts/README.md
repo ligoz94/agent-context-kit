@@ -4,6 +4,12 @@ Reusable workflow templates under `docs/agent/prompts/`. Load them with your IDE
 
 Files whose names start with **`_`** are **fragments** (included by other prompts). They do not appear in `list_prompts`; open them by path or call `get_prompt` with name `_review-dimensions`.
 
+### Prompts vs “skills”
+
+**Cursor skills** and **Claude Code skills** are often packaged as named workflows with metadata, sometimes loaded only when invoked.
+
+**Repo prompts** here serve a similar role for **this project**: a named markdown workflow (steps, inputs, explicit “do not” lines) that agents load via `get_prompt` / your slash commands. Use **repo prompts** for behavior you want **versioned** with the codebase and listed in Toolshed. Use **global skills** for personal or cross-repo shortcuts. See `docs/human/agent-context-power-user-stack.md` for a fuller mapping.
+
 ---
 
 ## When to use which prompt

@@ -1,0 +1,28 @@
+---
+alwaysApply: false
+---
+
+# Commit message & PR description
+
+When asked for a **commit message**, **PR description**, or **merge summary**, follow the canonical templates:
+
+- **PR body** → [`docs/agent/templates/pr-body.md`](../../docs/agent/templates/pr-body.md)
+- **Commit message / chat summary** → [`docs/agent/templates/commit-message.md`](../../docs/agent/templates/commit-message.md)
+
+These are the single source of truth. Do not inline or redefine sections here.
+
+## Quick reference
+
+| Output | Template |
+| --- | --- |
+| GitHub PR description | `pr-body.md` — full markdown layout |
+| Git commit | `commit-message.md` — subject + plain-text body |
+| Chat-only summary | `commit-message.md` — omit `Closes #…` if no issue |
+
+## Agent Report
+
+Fields are defined in [`docs/agent/values.md#agent-report-canonical-fields`](../../docs/agent/values.md#agent-report-canonical-fields). Copy the 7-bullet block exactly.
+
+## Agent Identification
+
+Every AI-posted PR comment must include the `**Agent:**` line per [`docs/agent/values.md#agent-identification-canonical-format`](../../docs/agent/values.md#agent-identification-canonical-format) — all 3 fields: `tool · model-id · effort`.

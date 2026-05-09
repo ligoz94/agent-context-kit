@@ -46,8 +46,20 @@ npx @agent-context-kit/cli init
 
 This adds `manifest.yaml`, `docs/agent/*`, `docs/features/`, `docs/human/`, `docs/decisions/`, **`.cursor/rules/*.mdc`**, **`.cursor/hooks.json`** (empty hooks + `hooks/README.md`), and `CLAUDE.md`.
 
-### 2. Fill in your project
+### 2. Fill in your project (interactive)
 
+Run the setup wizard to auto-detect your stack and pre-fill the project-specific sections:
+
+```bash
+npx @agent-context-kit/cli setup
+```
+
+The wizard will:
+- Detect your language and stack from `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, etc.
+- Prompt for a project description, architecture overview, key source paths, domain glossary terms, and project-specific rules
+- Write your answers directly into `manifest.yaml`, `architecture-primer.md`, `glossary.md`, and `values.md`
+
+Or fill in manually:
 - `manifest.yaml` — project name, stack, registry entries, optional `guardrails` and `profiles`
 - `docs/agent/values.md`, `glossary.md`, `architecture-primer.md` — L0
 - `docs/agent/context-policy.md` — L1 loading and tone
@@ -144,6 +156,7 @@ Canonical names below; aliases from `manifest.yaml` → `toolshed.tool_aliases` 
 | Command | Description |
 |---------|-------------|
 | `context-kit init` | Scaffold manifest and docs (skips existing files) |
+| `context-kit setup` | Interactive wizard: auto-detect stack, fill project sections |
 | `context-kit check` | Required files + rough L0 token warnings |
 | `context-kit sync` | Refresh **engine** regions in agent markdown; **project** regions stay yours |
 | `context-kit list` | Lists prompts and feature markdown files under `docs/features/` |

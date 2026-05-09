@@ -28,16 +28,24 @@ context-kit init
 
 This creates `manifest.yaml`, `docs/agent/*`, `docs/features`, `docs/decisions`, `docs/human`, plus **Cursor** (`.cursor/rules/agent-context-kit.mdc`) and **Claude** (`CLAUDE.md`) entry points so agents know how to use the workflow.
 
-Then edit `manifest.yaml` and fill `docs/agent/values.md`, `glossary.md`, etc.
+Then run the interactive wizard to auto-detect your stack and pre-fill the project-specific docs:
+
+```bash
+context-kit setup
+```
+
+The wizard detects your language and stack from `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, etc., then asks a few focused questions (architecture overview, glossary terms, project rules) and writes the answers directly into your docs.
 
 ## Commands
 
 | Command | Description |
 |--------|-------------|
 | `context-kit init` | Scaffold the kit structure in the current directory |
+| `context-kit setup` | Interactive wizard: auto-detect stack, fill project sections |
 | `context-kit sync` | Update `<!-- agent-context-kit:engine -->` regions from the bundled template; keeps `<!-- agent-context-kit:project -->` blocks |
 | `context-kit check` | Check `manifest.yaml` exists, required files, rough token budget warnings |
 | `context-kit list` | List prompt files and feature specs in `docs/` |
+| `context-kit new-spec <name>` | Scaffold `docs/features/<name>.md` and add a registry entry |
 
 ```bash
 context-kit --help

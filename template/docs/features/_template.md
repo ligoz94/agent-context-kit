@@ -74,10 +74,25 @@
 - <API/Integration checks if applicable>
 - <Storybook/UI checks if applicable>
 
-## 9. Data Boundaries
+## 9. Domain Rules
 
-- **Inputs:** <input contract>
-- **Outputs:** <output contract>
+Inline domain constraints that affect this feature. Don't just reference other docs — state the rules the agent needs when implementing:
+
+- (e.g. "All amounts stored in cents, converted on display")
+- (e.g. "User must be authenticated — no anonymous access to this feature")
+
+## 10. Data Boundaries
+
+- **Inputs:** <What data comes in — API endpoints, query params, user input>
+- **Outputs:** <What data goes out — rendered UI, API responses, events>
+- **Storage:** <Where state lives — database, localStorage, URL params, cache>
+- **External calls:** <API endpoints or third-party services consumed>
+
+## 11. Security Assumptions
+
+- **Auth model:** <Who can access this feature? Role or permission required?>
+- **Data sensitivity:** <What data is confidential or PII?>
+- **Guardrails:** <Any input validation, rate-limiting, or access-control rules?>
 - **Storage:** <local/db/cache boundaries>
 - **External calls:** <apis/services>
 

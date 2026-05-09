@@ -172,11 +172,13 @@ export async function cmdInit(cwd: string = process.cwd()) {
     "architecture-primer.md",
     "context-policy.md",
     "key-learnings.md",
+    "app-config.md",
+    "product-context.md",
   ];
 
   ensureDir(join(cwd, "docs/agent/prompts"));
   ensureDir(join(cwd, "docs/agent/evals"));
-  ensureDir(join(cwd, "docs/features"));
+  ensureDir(join(cwd, "docs/features/specs"));
   ensureDir(join(cwd, "docs/human"));
   ensureDir(join(cwd, "docs/decisions"));
 
@@ -184,12 +186,25 @@ export async function cmdInit(cwd: string = process.cwd()) {
     copyTemplate(join(templateDir, "docs/agent", f), join(cwd, "docs/agent", f));
   }
 
-  copyTemplateDirFiles(templateDir, "docs/agent/evals", cwd);
+  copyTemplateDirFiles(
+    templateDir,
+    "docs/agent/evals",
+    cwd,
+    new Set([".gitkeep", "metrics.jsonl"]),
+  );
   copyTemplateDirFiles(templateDir, "docs/agent/prompts", cwd);
+
+  // Hub dispatcher — the entry point for every agent session
+  copyTemplate(join(templateDir, "docs/README.md"), join(cwd, "docs/README.md"));
 
   copyTemplate(
     join(templateDir, "docs/features/_template.md"),
     join(cwd, "docs/features/_template.md"),
+  );
+
+  copyTemplate(
+    join(templateDir, "docs/features/specs/_template.md"),
+    join(cwd, "docs/features/specs/_template.md"),
   );
 
   copyTemplate(
@@ -205,6 +220,18 @@ export async function cmdInit(cwd: string = process.cwd()) {
     join(templateDir, "docs/human/toolshed-mcp-setup.md"),
     join(cwd, "docs/human/toolshed-mcp-setup.md"),
   );
+
+  copyTemplate(
+    join(templateDir, "docs/human/way-of-working.md"),
+    join(cwd, "docs/human/way-of-working.md"),
+  );
+
+  copyTemplate(
+    join(templateDir, "docs/human/agentic-development.md"),
+    join(cwd, "docs/human/agentic-development.md"),
+  );
+
+  copyTemplate(join(templateDir, "docs/human/testing.md"), join(cwd, "docs/human/testing.md"));
 
   copyTemplate(
     join(templateDir, "docs/human/agent-context-power-user-stack.md"),
@@ -276,6 +303,8 @@ export function cmdSync(cwd: string = process.cwd()) {
     "architecture-primer.md",
     "context-policy.md",
     "key-learnings.md",
+    "app-config.md",
+    "product-context.md",
   ];
 
   let synced = 0;
@@ -316,10 +345,12 @@ export function cmdCheck(cwd: string = process.cwd()): number {
   }
 
   const required = [
+    "docs/README.md",
     "docs/agent/values.md",
     "docs/agent/context-policy.md",
     "docs/agent/architecture-primer.md",
     "docs/agent/key-learnings.md",
+    "docs/agent/app-config.md",
   ];
 
   for (const f of required) {
@@ -1417,13 +1448,116 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
     }
   }
 
+  // ── Update app-config.md project section ─────────────────────────────────
+  const appConfigPath = join(cwd, "docs/agent/app-config.md");
+  if (existsSync(appConfigPath)) {
+    try {
+      let content = readFileSync(appConfigPath, "utf8");
+      const devCmd = existsSync(join(cwd, "package.json"))
+        ? "npm run dev"
+        : detected.language === "go"
+          ? "go run ./cmd/..."
+          : "make dev";
+      const testCmd = existsSync(join(cwd, "package.json"))
+        ? "npm test"
+        : detected.language === "go"
+          ? "go test ./..."
+          : detected.language === "python"
+            ? "pytest"
+            : "make test";
+      const lintCmd = existsSync(join(cwd, "package.json"))
+        ? "npm run lint"
+        : detected.language === "go"
+          ? "golangci-lint run"
+          : "make lint";
+      const typeCmd =
+        detected.language === "typescript"
+          ? "npx tsc --noEmit"
+          : detected.language === "python"
+            ? "mypy ."
+            : "—";
+      const region =
+        `\n## Identity\n\n` +
+        `- **Project name:** \`${detected.name}\`\n` +
+        `- **Primary language:** ${detected.language}${detected.stack.length ? " / " + detected.stack.join(", ") : ""}\n` +
+        `- **Dev command:** \`${devCmd}\`\n` +
+        `- **Test command:** \`${testCmd}\`\n` +
+        `- **Lint command:** \`${lintCmd}\`\n` +
+        `- **Type check:** \`${typeCmd}\`\n\n` +
+        `## Paths\n\n` +
+        `| What | Path |\n|------|------|\n` +
+        `| Feature docs | \`docs/features/\` |\n` +
+        `| Feature register | \`docs/README.md\` |\n` +
+        `| Architecture primer | \`docs/agent/architecture-primer.md\` |\n` +
+        `| Key learnings | \`docs/agent/key-learnings.md\` |\n` +
+        `| Prompt templates | \`docs/agent/prompts/\` |\n` +
+        `| Decisions / ADRs | \`docs/decisions/\` |\n\n` +
+        `## Spec System\n\n` +
+        `- Feature specs live in \`docs/features/\` (single file or folder + \`specs/\` for decision records)\n` +
+        `- Scaffold a new spec: \`context-kit new-spec <name>\`\n` +
+        `- Register every feature in \`docs/README.md\` feature register and \`manifest.yaml registry\`\n\n` +
+        `## MCP Toolshed\n\n` +
+        `Toolshed MCP is configured in \`.mcp.json\` (Claude Code) or \`.cursor/mcp.json\` (Cursor).\n\n` +
+        `When available, prefer MCP tools over manually opening files:\n\n` +
+        `| Task | Tool |\n|------|------|\n` +
+        `| Orientation | \`get_project_identity\`, \`get_guardrails\` |\n` +
+        `| Feature spec | \`list_registry\` → \`get_spec\` |\n` +
+        `| Learnings | \`get_learnings\` |\n` +
+        `| Glossary | \`lookup_glossary\` |\n` +
+        `| Prompts | \`list_prompts\`, \`get_prompt\` |\n` +
+        `| Search | \`search_context\` |\n`;
+      content = replaceProjectRegion(content, region);
+      writeFileSync(appConfigPath, content);
+      ok("docs/agent/app-config.md");
+    } catch (e) {
+      fail(`Could not update app-config.md: ${(e as Error).message}`);
+    }
+  }
+
+  // ── Update product-context.md project section ─────────────────────────────
+  const productContextPath = join(cwd, "docs/agent/product-context.md");
+  if (existsSync(productContextPath)) {
+    try {
+      let content = readFileSync(productContextPath, "utf8");
+      const region =
+        `\n## Target User\n\n` +
+        `(Describe the primary user: role, technical level, use context.)\n\n` +
+        `## Primary Device\n\n` +
+        `(Describe the target device and viewport \u2014 e.g. "Desktop 1440px is the default.")\n\n` +
+        `## Constraints\n\n` +
+        `- (Add project-specific constraints)\n\n` +
+        `## Non-Goals\n\n` +
+        `- (Explicitly out of scope for this product)\n`;
+      content = replaceProjectRegion(content, region);
+      writeFileSync(productContextPath, content);
+      ok("docs/agent/product-context.md");
+    } catch (e) {
+      fail(`Could not update product-context.md: ${(e as Error).message}`);
+    }
+  }
+
+  // ── Update docs/README.md project name ───────────────────────────────────
+  const docsReadmePath = join(cwd, "docs/README.md");
+  if (existsSync(docsReadmePath)) {
+    try {
+      let content = readFileSync(docsReadmePath, "utf8");
+      content = content.replace(/^# Project Documentation/m, `# ${detected.name} Documentation`);
+      writeFileSync(docsReadmePath, content);
+      ok("docs/README.md");
+    } catch (e) {
+      fail(`Could not update docs/README.md: ${(e as Error).message}`);
+    }
+  }
+
   // ── Update AGENTS.md (Codex) ─────────────────────────────────────────────
   const agentsPath = join(cwd, "AGENTS.md");
   if (existsSync(agentsPath)) {
     try {
       const rulesBlock = projectRules.map((r) => `- ${r}`).join("\n");
       const ctxBlock = [
+        `- \`docs/README.md\` — reading order, task→prompt table, feature register`,
         `- \`docs/agent/values.md\` — non-negotiable rules`,
+        `- \`docs/agent/app-config.md\` — package names, paths, MCP config`,
         `- \`docs/agent/architecture-primer.md\` — system map${dataModels.length > 0 ? ` (${dataModels.map((m) => m.name).join(", ")} models)` : ""}`,
         `- \`docs/agent/glossary.md\` — domain terms`,
       ].join("\n");

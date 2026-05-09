@@ -1,14 +1,11 @@
 <!-- Implementation status legend (inline, per item):
-  ✅ implemented  🚧 partial/in-progress  📋 planned  ❌ dropped
-  Link related OpenSpec specs where relevant: **Flow Name** ([spec](../../../../../../openspec/specs/<name>/spec.md)): -->
+  ✅ implemented  🚧 partial/in-progress  📋 planned  ❌ dropped -->
 
 # Decision Spec: <feature-area> — <decision-title>
 
 **Status:** `needs-discovery` | `planned` | `partial` | `implemented`
 **Domain:** <domain-name>
-**Owner:** <team or role>
 **Related feature:** [../feature.md](../feature.md)
-**OpenSpec:** (optional) [`<spec-name>`](../../../../../../openspec/specs/<spec-name>/spec.md)
 **Change request:** <PR/Issue URL or internal ticket, optional>
 
 ## 1. Objective

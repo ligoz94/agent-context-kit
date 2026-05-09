@@ -27,7 +27,9 @@ Do **not** fetch every feature spec; only the one needed for the current task.
 
 ## Without MCP
 
-Read in this order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` when relevant. Open **one** feature file under `docs/features/` when working on that feature. If `manifest.yaml` defines `guardrails`, read that section manually.
+Start from **`docs/README.md`** — it has the numbered reading order, task→prompt table, and feature register.
+Minimum L0: `docs/agent/values.md` → `docs/agent/app-config.md` → `docs/README.md` (feature register + pick prompt).
+Then open **one** feature file under `docs/features/` for the area you’re working in. If `manifest.yaml` defines `guardrails`, read that section manually.
 
 ## Source of truth
 

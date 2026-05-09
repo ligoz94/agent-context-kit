@@ -1647,48 +1647,45 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
   }
 
   // ── Generate MCP configs ──────────────────────────────────────────────────
-  const mcpPayload = JSON.stringify(
-    {
+  const mcpServerEntry = {
+    command: "npx",
+    args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
+  };
+
+  function writeMcpConfig(mcpPath: string, label: string) {
+    let existing: Record<string, any> = {};
+    if (existsSync(mcpPath)) {
+      try {
+        existing = JSON.parse(readFileSync(mcpPath, "utf8"));
+      } catch {
+        // malformed — overwrite
+      }
+    }
+    const merged = {
+      ...existing,
       mcpServers: {
-        toolshed: {
-          command: "npx",
-          args: ["-y", "@agent-context-kit/toolshed-server"],
-          cwd: ".",
-        },
+        ...(existing.mcpServers ?? {}),
+        toolshed: mcpServerEntry,
       },
-    },
-    null,
-    2,
-  );
+    };
+    try {
+      writeFileSync(mcpPath, JSON.stringify(merged, null, 2));
+      ok(`${label}  (Toolshed MCP)`);
+    } catch (e) {
+      fail(`Could not write ${label}: ${(e as Error).message}`);
+    }
+  }
 
   // Cursor: .cursor/mcp.json
   const cursorMcpPath = join(cwd, ".cursor/mcp.json");
   if (existsSync(join(cwd, ".cursor"))) {
-    if (!existsSync(cursorMcpPath)) {
-      try {
-        writeFileSync(cursorMcpPath, mcpPayload);
-        ok(".cursor/mcp.json  (Cursor MCP)");
-      } catch (e) {
-        fail(`Could not write .cursor/mcp.json: ${(e as Error).message}`);
-      }
-    } else {
-      warn("Skipped (exists): .cursor/mcp.json");
-    }
+    writeMcpConfig(cursorMcpPath, ".cursor/mcp.json");
   }
 
   // Claude Code: .mcp.json (project-scoped)
   const claudeMcpPath = join(cwd, ".mcp.json");
   if (existsSync(join(cwd, "CLAUDE.md"))) {
-    if (!existsSync(claudeMcpPath)) {
-      try {
-        writeFileSync(claudeMcpPath, mcpPayload);
-        ok(".mcp.json         (Claude Code MCP)");
-      } catch (e) {
-        fail(`Could not write .mcp.json: ${(e as Error).message}`);
-      }
-    } else {
-      warn("Skipped (exists): .mcp.json");
-    }
+    writeMcpConfig(claudeMcpPath, ".mcp.json       ");
   }
 
   // Codex: no standard MCP config file yet — print instructions

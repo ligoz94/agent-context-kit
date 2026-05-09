@@ -33,6 +33,8 @@ Then use the `populate-project` prompt to fill the rest in one session:
 
 > Run `get_project_identity` and `get_guardrails`, then tell me your task.
 
+`get_project_identity` only covers the manifest identity bundle (`values.md`, `architecture-primer.md`, `glossary.md`). After that first pass, explicitly open `docs/agent/app-config.md`, `docs/agent/product-context.md`, and `docs/README.md` to complete L0 context.
+
 **Without MCP:**
 
 > Read `docs/README.md`. My task is: [describe task].

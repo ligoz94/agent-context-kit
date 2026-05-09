@@ -40,11 +40,14 @@ Then pick the right prompt from the table below.
 
 ## Feature Register
 
-Status: `implemented` | `partial` | `planned` | `deprecated`
+Status: `stable` | `wip` | `deprecated`
 
 | Feature | Status | Description | Specs |
 | ------- | ------ | ----------- | ----- |
-| _(add features here)_ | — | — | — |
+| `agentic-development-workflow` | `stable` | End-to-end issue → spec → implement → review workflow for agent-driven delivery. | [agentic-development-workflow.md](features/agentic-development-workflow.md) |
+| `context-loading-model` | `stable` | Layered loading contract for L0/L1/L2 context, including manual reads required beyond MCP identity. | [context-loading-model.md](features/context-loading-model.md) |
+| `feature-spec-registry` | `stable` | How feature docs are registered, scaffolded, and kept in sync between `manifest.yaml` and `docs/README.md`. | [feature-spec-registry.md](features/feature-spec-registry.md) |
+| `toolshed-mcp-integration` | `stable` | Toolshed setup, tool usage expectations, and MCP-specific orientation flow. | [toolshed-mcp-integration.md](features/toolshed-mcp-integration.md) |
 
 <!-- agent-context-kit:feature-register:start -->
 <!-- agent-context-kit:feature-register:end -->

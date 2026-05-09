@@ -60,6 +60,8 @@ Do **not** preload the entire `features/` tree or all domain docs for a single s
 
 If the app has an MCP Toolshed server configured (check app-config.md § MCP Toolshed), **query** instead of bulk-reading files:
 
+`get_project_identity` currently exposes the manifest identity bundle only: `values.md`, `architecture-primer.md`, and `glossary.md`. Agents must still open the app's `app-config.md`, `product-context.md`, and `docs/README.md` to complete L0 orientation.
+
 - `lookup_glossary` — domain terminology
 - `get_spec` / `get_feature_doc` — feature intent and spec text
 - `list_registry` — register overview

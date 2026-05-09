@@ -24,6 +24,8 @@ rules:
   standards:
     - name: testing
       path: docs/human/testing.md
+    - name: agentic-development
+      path: docs/human/agentic-development.md
     - name: way-of-working
       path: docs/human/way-of-working.md
 
@@ -38,7 +40,19 @@ knowledge:
 # ── Feature registry ─────────────────────────────────────────────────────────
 # Named specs the Toolshed exposes via get_spec().
 # Add a new entry for every significant feature.
-registry: []
+registry:
+  - name: agentic-development-workflow
+    path: docs/features/agentic-development-workflow.md
+    status: stable
+  - name: context-loading-model
+    path: docs/features/context-loading-model.md
+    status: stable
+  - name: feature-spec-registry
+    path: docs/features/feature-spec-registry.md
+    status: stable
+  - name: toolshed-mcp-integration
+    path: docs/features/toolshed-mcp-integration.md
+    status: stable
 # Example:
 # registry:
 #   - name: auth-flow

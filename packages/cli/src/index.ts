@@ -555,7 +555,7 @@ export function cmdList(cwd: string = process.cwd()) {
   const featuresDir = join(cwd, "docs/features");
   if (existsSync(featuresDir)) {
     const features = readdirSync(featuresDir).filter(
-      (f) => f.endsWith(".md") && !f.startsWith("_"),
+      (f) => f.endsWith(".md") && !f.startsWith("_") && f !== "README.md",
     );
     console.log("\n  Features:");
     features.forEach((f) => console.log(`    - ${f.replace(".md", "")}`));

@@ -1,9 +1,11 @@
 ---
 description: Unified project protocol placeholder (single source)
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Role & Project Context
+
+This is a placeholder rule. Customize it before enabling it as an always-on Cursor rule.
 
 You are an expert Senior <ROLE_STACK>. Your objective is to maintain the `<PROJECT_NAME>` repository with technical rigor and architectural consistency.
 

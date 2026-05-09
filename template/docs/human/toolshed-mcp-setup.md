@@ -103,7 +103,8 @@ Paths in `args` are resolved from `cwd`.
 Keep your **enabled MCP server list small** (each server adds tool schemas to context). See [Cursor alignment](agent-context-power-user-stack.md#cursor-alignment) in **agent-context-power-user-stack.md**.
 
 1. Open **Cursor Settings → MCP** (or edit the MCP JSON your workspace uses).
-2. Add a server entry equivalent to:
+2. Confirm the workspace contains **`.cursor/mcp.json`** after `context-kit init` or `context-kit setup`.
+3. Add or verify a server entry equivalent to:
 
 ```json
 {
@@ -118,6 +119,19 @@ Keep your **enabled MCP server list small** (each server adds tool schemas to co
 ```
 
 Use the **same rules** as Claude Desktop: `cwd` = root with `manifest.yaml`. Restart the MCP connection or Cursor after changes.
+
+### Cursor activation checklist
+
+If Cursor is not calling Toolshed tools, check these in order:
+
+1. **Server file exists** — `.cursor/mcp.json` is present in the workspace root.
+2. **Server is enabled** — open Cursor MCP settings and make sure `toolshed` is not disabled.
+3. **Server is trusted** — accept the trust prompt for the local MCP server.
+4. **Restart happened** — restart Cursor or the MCP connection after `mcp.json` changes.
+5. **Tools are visible in chat** — if `get_project_identity` and `get_guardrails` do not appear in available tools, Cursor has not connected the server.
+6. **Rules are present** — `.cursor/rules/agent-context-kit.mdc` exists and the workspace is trusted.
+
+If the tools are available but the agent still skips them, open a new chat so the rule and tool inventory are reloaded from a clean session.
 
 ## Tool name collisions
 

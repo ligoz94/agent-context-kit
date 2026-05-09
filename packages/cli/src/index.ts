@@ -102,6 +102,25 @@ export function copyTemplate(src: string, dest: string, force = false) {
   }
 }
 
+export function writeWorkspaceMcpConfig(mcpPath: string, serverName: string, serverEntry: object) {
+  let existing: Record<string, any> = {};
+  if (existsSync(mcpPath)) {
+    try {
+      existing = JSON.parse(readFileSync(mcpPath, "utf8"));
+    } catch {
+      // malformed — overwrite
+    }
+  }
+  const merged = {
+    ...existing,
+    mcpServers: {
+      ...(existing.mcpServers ?? {}),
+      [serverName]: serverEntry,
+    },
+  };
+  writeFileSync(mcpPath, JSON.stringify(merged, null, 2));
+}
+
 /** Copy every file in a template subdir (e.g. evals) — skips `.gitkeep`. */
 export function copyTemplateDirFiles(
   templateDir: string,
@@ -285,6 +304,20 @@ export async function cmdInit(cwd: string = process.cwd()) {
       join(templateDir, ".cursor/hooks/README.md"),
       join(cwd, ".cursor/hooks/README.md"),
     );
+    try {
+      writeWorkspaceMcpConfig(join(cwd, ".cursor/mcp.json"), "toolshed", {
+        command: "npx",
+        args: [
+          "-y",
+          "@agent-context-kit/toolshed-server",
+          "--manifest",
+          join(cwd, "manifest.yaml"),
+        ],
+      });
+      ok("Created: .cursor/mcp.json");
+    } catch (e) {
+      fail(`Could not write .cursor/mcp.json: ${(e as Error).message}`);
+    }
   }
 
   if (installClaude) {
@@ -1653,23 +1686,8 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
   };
 
   function writeMcpConfig(mcpPath: string, label: string) {
-    let existing: Record<string, any> = {};
-    if (existsSync(mcpPath)) {
-      try {
-        existing = JSON.parse(readFileSync(mcpPath, "utf8"));
-      } catch {
-        // malformed — overwrite
-      }
-    }
-    const merged = {
-      ...existing,
-      mcpServers: {
-        ...(existing.mcpServers ?? {}),
-        toolshed: mcpServerEntry,
-      },
-    };
     try {
-      writeFileSync(mcpPath, JSON.stringify(merged, null, 2));
+      writeWorkspaceMcpConfig(mcpPath, "toolshed", mcpServerEntry);
       ok(`${label}  (Toolshed MCP)`);
     } catch (e) {
       fail(`Could not write ${label}: ${(e as Error).message}`);

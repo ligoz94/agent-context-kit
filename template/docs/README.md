@@ -15,6 +15,8 @@ All processes, feature designs, specs, and domain knowledge for this project.
 
 Then pick the right prompt from the table below.
 
+Agents should infer the correct prompt from the user's task even if the prompt name is not mentioned explicitly. Use the task wording as the router signal, then load only the matching prompt and relevant feature docs.
+
 ---
 
 ## Quick Navigation

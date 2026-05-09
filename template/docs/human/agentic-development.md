@@ -41,6 +41,8 @@ Then use the `populate-project` prompt to fill the rest in one session:
 
 The agent will check the reading order, pick the right prompt, and tell you what it will open next.
 
+The user does not need to type the prompt name exactly. A good agent should infer the workflow from the task wording, for example "fix this regression" → `fix-bug`, "implement this approved spec" → `implement-feature`, "align docs for this issue" → `update-docs`.
+
 ---
 
 ## The development pipeline

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # agent-context-kit workflow
 
-This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/agent/` plus an optional **Toolshed** MCP server (`manifest.yaml`). Follow this every session.
+This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/agent/` plus a **Toolshed** MCP server (`manifest.yaml`). Follow this every substantive session.
 
 ## Cursor alignment (same stack as “power user” write-ups)
 
@@ -14,6 +14,44 @@ This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/
 - **Plan before risky work:** use **Cursor Plan mode** ([docs](https://www.cursor.com/docs/agent/modes)) for multi-file or high-uncertainty tasks; align plans with `docs/agent/context-policy.md` (L1/L2).
 - **Few MCP servers:** Cursor **Settings → MCP** — prefer Toolshed plus a small set of justified servers (each adds tool schemas to context).
 - **Hooks (optional):** [Cursor Hooks](https://docs.cursor.com/agent/hooks) — **`.cursor/hooks.json`** (created by **`context-kit init`**, starts with an empty `hooks` object) and **`.cursor/hooks/README.md`**; add scripts under **`.cursor/hooks/`** when needed. Pair with `manifest.yaml` **guardrails** and Toolshed approval tools where configured.
+
+## Required startup behavior
+
+For any non-trivial request, do not jump straight to code or a generic answer.
+
+- If **Toolshed MCP tools are available**, start with the MCP sequence below.
+- If **Toolshed MCP tools are not available**, immediately fall back to the file-reading sequence below.
+- If neither path is possible because files or tools are missing, say that explicitly before proceeding.
+
+After the startup step, **infer the workflow from the user's task message even when they did not name a prompt explicitly**. Treat the task wording as the router input.
+
+## Task router
+
+Map the user's request to the nearest workflow below before proceeding.
+
+| User intent in the task message | Workflow to run | Required next context |
+| --- | --- | --- |
+| "implement", "build", "add", "create feature" | `implement-feature` | `get_rules` or `docs/agent/context-policy.md`, then `list_registry` → `get_spec` for the target feature |
+| "bug", "fix", "regression", "broken" | `fix-bug` | `get_rules` or `docs/agent/context-policy.md`, then `get_learnings`, then feature spec |
+| "review PR", "review these changes", "code review" | `review-pr` | `get_rules` or `docs/agent/context-policy.md`, then related spec and `prompts/_review-dimensions.md` |
+| "update docs", "write spec", "document", "align docs" | `update-docs` | `get_rules` or `docs/agent/context-policy.md`, then feature register and relevant feature doc/template |
+| "finish", "pre-push", "ready to push" | `finish` | spec for completed work plus `prompts/_review-dimensions.md` |
+| "triage issue", issue intake, vague new request | `triage-issue` | feature register first, then issue details |
+| "triage all", backlog grooming | `triage-all-issues` | feature register plus triage prompt |
+| "populate project", first run after init/setup | `populate-project` | repo README, package/config files, current docs placeholders |
+| "review spec" | `review-spec` | feature doc, spec template, related feature spec |
+| "fix PR", "address review comments", CI failures on PR | `fix-pr` | `get_learnings`, PR findings, failing checks |
+| "ui test", browser verification | `ui-test` | target feature spec and acceptance criteria |
+| request is ambiguous or cross-cuts multiple rows | ask one clarifying question | do not pick a workflow until ambiguity is reduced |
+
+If the task matches one row strongly, proceed with that workflow automatically. Do not wait for the user to type the prompt file name.
+
+## Workflow discipline
+
+- For the chosen workflow, load the matching prompt from `docs/agent/prompts/` if MCP prompt tools are unavailable.
+- If MCP prompt tools are available, prefer `list_prompts` / `get_prompt` for the chosen workflow.
+- Use `docs/README.md` as the dispatcher when the task could fit more than one workflow.
+- If the task is trivial but still changes code, at minimum load L0 and the nearest workflow context before editing.
 
 ## If Toolshed MCP is connected
 
@@ -28,13 +66,15 @@ At the **start** of a substantive session (or before a large change):
 7. Check **`get_learnings`** before recommending patterns that might repeat past mistakes.
 8. Use **`search_context`** or **`validate_context`** when you need to locate or verify docs paths.
 
+If Cursor does not show these tools, treat MCP as unavailable rather than pretending the startup sequence happened.
+
 **Persisting changes** (only if the user expects repo updates): **`add_learning`**, **`add_glossary_term`**, **`update_feature_status`**.
 
 If a tool fails (missing file), say so briefly and continue with what you can read from the repo.
 
 ## If MCP is not available
 
-Read in order: `docs/agent/values.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` as needed. Use `docs/features/` only for the feature you are working on. Read `guardrails` in `manifest.yaml` if present.
+Read in order: `docs/README.md`, `docs/agent/values.md`, `docs/agent/app-config.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` as needed. Use `docs/features/` only for the feature you are working on. Read `guardrails` in `manifest.yaml` if present.
 
 ## Discipline
 

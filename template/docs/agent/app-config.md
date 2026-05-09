@@ -36,7 +36,7 @@ Read as part of L0 to resolve all project-specific references in shared prompts.
 
 ## MCP Toolshed
 
-Toolshed MCP is configured in `.mcp.json` (Claude Code) or `.cursor/mcp.json` (Cursor).
+Toolshed MCP is configured in `.mcp.json` (Claude Code) or `.cursor/mcp.json` (Cursor). In Cursor, confirm the `toolshed` server is trusted and enabled before expecting `get_project_identity`, `get_guardrails`, or other Toolshed tools to be called.
 
 When available, prefer MCP tools over manually opening files:
 

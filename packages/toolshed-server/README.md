@@ -42,21 +42,27 @@ Paths inside `manifest.yaml` are resolved relative to the manifest file’s dire
 
 ## MCP client (e.g. Cursor, Claude Desktop)
 
-Point **`cwd`** at the project root and use `npx`:
+Use an **absolute path** to `manifest.yaml` in the `args` — this is the most reliable approach regardless of which directory the editor starts the process from:
 
 ```json
 {
   "mcpServers": {
     "toolshed": {
       "command": "npx",
-      "args": ["-y", "@agent-context-kit/toolshed-server"],
-      "cwd": "/absolute/path/to/your/project"
+      "args": [
+        "-y",
+        "@agent-context-kit/toolshed-server",
+        "--manifest",
+        "/absolute/path/to/your/project/manifest.yaml"
+      ]
     }
   }
 }
 ```
 
-Add `"--manifest", "./config/manifest.yaml"` to `args` when needed. Add `"--profile", "frontend"` for a named profile.
+`npx @agent-context-kit/cli setup` generates this file automatically with the correct absolute path.
+
+Add `"--profile", "frontend"` to `args` for a named profile.
 
 If tool names clash with another server, set `toolshed.tool_aliases` in `manifest.yaml`.
 
@@ -64,33 +70,33 @@ If tool names clash with another server, set `toolshed.tool_aliases` in `manifes
 
 ### Read context
 
-| Tool | Purpose |
-|------|---------|
-| `get_project_identity` | L0: values, architecture, glossary |
-| `get_guardrails` | Blocked actions, approval list, allowed domains |
-| `get_rules` | L1: policy + standards |
-| `get_learnings` | L2: key learnings |
-| `get_spec` | Feature spec from registry |
-| `list_registry` | Feature list + status |
-| `lookup_glossary` | Term lookup |
+| Tool                          | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `get_project_identity`        | L0: values, architecture, glossary                 |
+| `get_guardrails`              | Blocked actions, approval list, allowed domains    |
+| `get_rules`                   | L1: policy + standards                             |
+| `get_learnings`               | L2: key learnings                                  |
+| `get_spec`                    | Feature spec from registry                         |
+| `list_registry`               | Feature list + status                              |
+| `lookup_glossary`             | Term lookup                                        |
 | `get_prompt` / `list_prompts` | Prompt templates (`get_prompt` supports variables) |
-| `search_context` | Search configured context paths |
+| `search_context`              | Search configured context paths                    |
 
 ### Validate & persist
 
-| Tool | Purpose |
-|------|---------|
-| `validate_context` | Verify manifest paths exist |
-| `add_learning` | Append to `key-learnings.md` |
-| `add_glossary_term` | Append to `glossary.md` |
+| Tool                    | Purpose                                   |
+| ----------------------- | ----------------------------------------- |
+| `validate_context`      | Verify manifest paths exist               |
+| `add_learning`          | Append to `key-learnings.md`              |
+| `add_glossary_term`     | Append to `glossary.md`                   |
 | `update_feature_status` | Update registry status in `manifest.yaml` |
 
 ### Safety & verification
 
-| Tool | Purpose |
-|------|---------|
-| `request_human_approval` | Structured approval request |
-| `verify_action` | Post-condition checks (files, commands, HTTP, JSON) |
+| Tool                     | Purpose                                             |
+| ------------------------ | --------------------------------------------------- |
+| `request_human_approval` | Structured approval request                         |
+| `verify_action`          | Post-condition checks (files, commands, HTTP, JSON) |
 
 The same surface is available from **`@agent-context-kit/langchain`** via `createContextKitTools()`.
 

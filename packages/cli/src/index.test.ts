@@ -3,6 +3,8 @@ import {
   findTemplateDir,
   cmdCheck,
   syncEngineRegions,
+  detectProjectInfo,
+  replaceProjectRegion,
 } from "./index.js";
 import fs from "fs";
 import path from "path";
@@ -127,4 +129,55 @@ NEW STUFF
       );
     });
   });
+
+  describe("detectProjectInfo", () => {
+    it("detects typescript and react stack from package.json", () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).endsWith("package.json"),
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          name: "my-app",
+          dependencies: { react: "^18", typescript: "^5" },
+        }),
+      );
+      const info = detectProjectInfo("/tmp/proj");
+      expect(info.name).toBe("my-app");
+      expect(info.language).toBe("typescript");
+      expect(info.stack).toContain("react");
+    });
+
+    it("detects go from go.mod", () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).endsWith("go.mod"),
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue("module github.com/org/myservice\n");
+      const info = detectProjectInfo("/tmp/proj");
+      expect(info.language).toBe("go");
+      expect(info.name).toBe("myservice");
+    });
+
+    it("falls back to directory name when no project files found", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const info = detectProjectInfo("/tmp/my-cool-project");
+      expect(info.name).toBe("my-cool-project");
+    });
+  });
+
+  describe("replaceProjectRegion", () => {
+    it("replaces project region content", () => {
+      const content = `header\n<!-- agent-context-kit:project:start -->\nOLD\n<!-- agent-context-kit:project:end -->\nfooter`;
+      const result = replaceProjectRegion(content, "NEW CONTENT");
+      expect(result).toContain("NEW CONTENT");
+      expect(result).not.toContain("OLD");
+      expect(result).toContain("header");
+      expect(result).toContain("footer");
+    });
+
+    it("returns content unchanged if no project region exists", () => {
+      const content = "no regions here";
+      expect(replaceProjectRegion(content, "NEW")).toBe("no regions here");
+    });
+  });
 });
+

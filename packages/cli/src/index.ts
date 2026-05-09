@@ -4,11 +4,12 @@
  * @agent-context-kit/cli
  *
  * Commands:
- *   context-kit init     — scaffold docs/agent/ in the current project
- *   context-kit sync     — update engine regions, preserve project regions
- *   context-kit check    — validate manifest, L0 token budgets, optional CLAUDE.md size hints
- *   context-kit list     — list prompts and feature files
- *   context-kit new-spec — scaffold docs/features/<name>.md + registry entry
+ *   context-kit init       — scaffold docs/agent/ in the current project
+ *   context-kit setup      — interactive wizard to pre-fill project-specific sections
+ *   context-kit sync       — update engine regions, preserve project regions
+ *   context-kit check      — validate manifest, L0 token budgets, optional CLAUDE.md size hints
+ *   context-kit list       — list prompts and feature files
+ *   context-kit new-spec   — scaffold docs/features/<name>.md + registry entry
  */
 
 import {
@@ -21,6 +22,7 @@ import {
 } from "fs";
 import { resolve, join, relative, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createInterface, type Interface } from "readline";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -202,9 +204,9 @@ export function cmdInit(cwd: string = process.cwd()) {
 
   console.log("");
   log("Done. Next steps:");
-  console.log("  1. Edit manifest.yaml — fill in your project name and stack");
-  console.log("  2. Fill docs/agent/values.md with your non-negotiables");
-  console.log("  3. Fill docs/agent/glossary.md with your project terms");
+  console.log("  1. Run: context-kit setup  (interactive wizard to fill project sections)");
+  console.log("  2. Or manually fill manifest.yaml — project name, stack, etc.");
+  console.log("  3. Fill docs/agent/architecture-primer.md and docs/agent/glossary.md");
   console.log("  4. Wire MCP: docs/human/toolshed-mcp-setup.md");
   console.log(
     "  5. Optional: docs/human/agent-context-power-user-stack.md (layered stack, few MCPs, hooks)",
@@ -432,6 +434,7 @@ export function cmdHelp() {
 
   Commands:
     init              Scaffold docs/agent/ structure in this project
+    setup             Interactive wizard: auto-detect stack, fill project sections
     sync              Update engine regions in existing files
     check             Validate required files, L0 token hints, CLAUDE.md size hints
     list              List available prompts and features
@@ -440,6 +443,243 @@ export function cmdHelp() {
   Options:
     --help  Show this help
 `);
+}
+
+// ── Setup: interactive project config ─────────────────────────────────────────
+
+function ask(rl: Interface, question: string): Promise<string> {
+  return new Promise((resolve) => rl.question(question, (ans) => resolve(ans.trim())));
+}
+
+export interface DetectedInfo {
+  name: string;
+  language: string;
+  stack: string[];
+}
+
+/** Auto-detect project name, language, and stack from common project files. */
+export function detectProjectInfo(cwd: string): DetectedInfo {
+  let name = "my-project";
+  let language = "typescript";
+  const stack: string[] = [];
+
+  const pkgPath = join(cwd, "package.json");
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      if (pkg.name) name = pkg.name;
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      language = deps["typescript"] ? "typescript" : "javascript";
+      if (deps["react"]) stack.push("react");
+      if (deps["next"]) stack.push("nextjs");
+      if (deps["vue"]) stack.push("vue");
+      if (deps["svelte"]) stack.push("svelte");
+      if (deps["express"]) stack.push("express");
+      if (deps["fastify"]) stack.push("fastify");
+      if (deps["hono"]) stack.push("hono");
+      if (deps["prisma"] || deps["@prisma/client"]) stack.push("prisma");
+      if (deps["drizzle-orm"]) stack.push("drizzle");
+      if (deps["postgres"] || deps["pg"] || deps["@neondatabase/serverless"]) stack.push("postgres");
+      if (deps["mysql2"]) stack.push("mysql");
+      if (deps["mongoose"]) stack.push("mongodb");
+      if (deps["redis"] || deps["ioredis"]) stack.push("redis");
+    } catch { /* ignore parse errors */ }
+  }
+
+  if (existsSync(join(cwd, "go.mod"))) {
+    language = "go";
+    if (name === "my-project") {
+      try {
+        const mod = readFileSync(join(cwd, "go.mod"), "utf8");
+        const m = mod.match(/^module (.+)/m);
+        if (m) name = m[1].split("/").pop() ?? name;
+      } catch { /* ignore */ }
+    }
+  }
+
+  if (existsSync(join(cwd, "pyproject.toml")) || existsSync(join(cwd, "setup.py"))) {
+    language = "python";
+  }
+
+  if (existsSync(join(cwd, "Cargo.toml"))) {
+    language = "rust";
+    try {
+      const cargo = readFileSync(join(cwd, "Cargo.toml"), "utf8");
+      const m = cargo.match(/^name\s*=\s*"([^"]+)"/m);
+      if (m) name = m[1];
+    } catch { /* ignore */ }
+  }
+
+  if (existsSync(join(cwd, "pom.xml"))) language = "java";
+  if (existsSync(join(cwd, "build.gradle")) || existsSync(join(cwd, "build.gradle.kts"))) {
+    language = "kotlin";
+  }
+
+  if (name === "my-project") {
+    name = cwd.split("/").pop() ?? name;
+  }
+
+  return { name, language, stack };
+}
+
+/** Replace the content of a project region in a file's string. */
+export function replaceProjectRegion(content: string, newContent: string): string {
+  const start = "<!-- agent-context-kit:project:start -->";
+  const end = "<!-- agent-context-kit:project:end -->";
+  const regex =
+    /<!-- agent-context-kit:project:start -->[\s\S]*?<!-- agent-context-kit:project:end -->/;
+  if (!regex.test(content)) return content;
+  return content.replace(regex, `${start}\n${newContent}\n${end}`);
+}
+
+/**
+ * Interactive setup wizard. Auto-detects stack and prompts for project-specific
+ * content, then pre-fills the `project:` regions of the key docs/agent/ files.
+ */
+export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
+  const manifestPath = join(cwd, "manifest.yaml");
+  if (!existsSync(manifestPath)) {
+    fail("manifest.yaml not found. Run: context-kit init first");
+    process.exit(1);
+  }
+
+  const detected = detectProjectInfo(cwd);
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  log("Interactive project setup — press Enter to accept defaults.\n");
+
+  const name = (await ask(rl, `  Project name [${detected.name}]: `)) || detected.name;
+  const description = await ask(rl, `  Short description for the LLM (1-2 sentences): `);
+  const language =
+    (await ask(rl, `  Primary language [${detected.language}]: `)) || detected.language;
+  const stackDefault = detected.stack.join(", ");
+  const stackInput = await ask(
+    rl,
+    `  Stack, comma-separated${stackDefault ? ` [${stackDefault}]` : ""}: `,
+  );
+  const stack = stackInput
+    ? stackInput.split(",").map((s) => s.trim()).filter(Boolean)
+    : detected.stack;
+
+  console.log("");
+  log("Architecture — how is the system structured?");
+  const archOverview = await ask(rl, `  Overview (1-3 sentences): `);
+  const archPaths = await ask(
+    rl,
+    `  Key source paths, comma-separated\n  (e.g. src/api — REST handlers, src/db — models): `,
+  );
+
+  console.log("");
+  log("Glossary — core domain terms (add more later in docs/agent/glossary.md):");
+  const termsRaw = await ask(rl, `  Terms (Term: definition; Term2: definition2): `);
+
+  console.log("");
+  log("Project rules — non-negotiables for this codebase:");
+  const rulesRaw = await ask(
+    rl,
+    `  Rules, comma-separated\n  (e.g. All DB queries through repository layer, No raw SQL in handlers): `,
+  );
+
+  rl.close();
+  console.log("");
+
+  // ── Update manifest.yaml ──────────────────────────────────────────────────
+  try {
+    let raw = readFileSync(manifestPath, "utf8");
+    raw = raw.replace(/name:\s*"[^"]*"/, `name: "${name}"`);
+    if (description) {
+      raw = raw.replace(
+        /description:\s*"[^"]*"/,
+        `description: "${description.replace(/"/g, '\\"')}"`,
+      );
+    }
+    raw = raw.replace(/language:\s*"[^"]*"/, `language: "${language}"`);
+    if (stack.length > 0) {
+      raw = raw.replace(
+        /stack:\s*\[\]/,
+        `stack: [${stack.map((s) => `"${s}"`).join(", ")}]`,
+      );
+    }
+    writeFileSync(manifestPath, raw);
+    ok("manifest.yaml");
+  } catch (e) {
+    fail(`Could not update manifest.yaml: ${(e as Error).message}`);
+  }
+
+  // ── Update architecture-primer.md ─────────────────────────────────────────
+  const archPath = join(cwd, "docs/agent/architecture-primer.md");
+  if (existsSync(archPath) && (archOverview || archPaths)) {
+    try {
+      let content = readFileSync(archPath, "utf8");
+      const pathLines = archPaths
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => `- \`${p}\``)
+        .join("\n");
+      const sections = [
+        archOverview ? `## Overview\n\n${archOverview}` : "",
+        pathLines ? `## Key paths\n\n${pathLines}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      content = replaceProjectRegion(content, "\n" + sections + "\n");
+      writeFileSync(archPath, content);
+      ok("docs/agent/architecture-primer.md");
+    } catch (e) {
+      fail(`Could not update architecture-primer.md: ${(e as Error).message}`);
+    }
+  }
+
+  // ── Update glossary.md ────────────────────────────────────────────────────
+  const glossaryPath = join(cwd, "docs/agent/glossary.md");
+  if (existsSync(glossaryPath) && termsRaw) {
+    try {
+      let content = readFileSync(glossaryPath, "utf8");
+      const pairs = termsRaw.split(";").map((s) => s.trim()).filter(Boolean);
+      const rows = pairs.map((p) => {
+        const colonIdx = p.indexOf(":");
+        if (colonIdx === -1) return `| ${p} | |`;
+        const term = p.slice(0, colonIdx).trim();
+        const def = p.slice(colonIdx + 1).trim();
+        return `| ${term} | ${def} |`;
+      });
+      const table = ["| Term | Definition |", "|------|------------|", ...rows].join("\n");
+      content = replaceProjectRegion(content, "\n" + table + "\n");
+      writeFileSync(glossaryPath, content);
+      ok("docs/agent/glossary.md");
+    } catch (e) {
+      fail(`Could not update glossary.md: ${(e as Error).message}`);
+    }
+  }
+
+  // ── Update values.md project section ─────────────────────────────────────
+  const valuesPath = join(cwd, "docs/agent/values.md");
+  if (existsSync(valuesPath) && rulesRaw) {
+    try {
+      let content = readFileSync(valuesPath, "utf8");
+      const rules = rulesRaw
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean)
+        .map((r) => `- "${r}"`)
+        .join("\n");
+      const newRegion = `\n## Project-specific values\n\n${rules}\n`;
+      content = replaceProjectRegion(content, newRegion);
+      writeFileSync(valuesPath, content);
+      ok("docs/agent/values.md");
+    } catch (e) {
+      fail(`Could not update values.md: ${(e as Error).message}`);
+    }
+  }
+
+  console.log("");
+  log("Setup complete! Suggested next steps:");
+  console.log("  1. Review docs/agent/architecture-primer.md and expand it");
+  console.log("  2. Add more terms to docs/agent/glossary.md");
+  console.log("  3. Add feature specs: context-kit new-spec <feature-name>");
+  console.log("  4. Validate: context-kit check");
+  console.log("  5. Start MCP server: npx @agent-context-kit/toolshed-server");
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -456,6 +696,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   switch (command) {
     case "init":
       cmdInit();
+      break;
+    case "setup":
+      cmdSetup().then(() => process.exit(0)).catch((e) => {
+        fail((e as Error).message);
+        process.exit(1);
+      });
       break;
     case "sync":
       cmdSync();

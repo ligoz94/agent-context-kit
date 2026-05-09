@@ -7,6 +7,10 @@ alwaysApply: true
 
 This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/agent/` plus a **Toolshed** MCP server (`manifest.yaml`). Follow this every substantive session.
 
+# Role & Project Context
+
+You are maintaining a repository that uses `agent-context-kit` as its operating contract for docs, prompts, rules, and MCP-driven context loading.
+
 ## Cursor alignment (same stack as “power user” write-ups)
 
 - **Keep ambient context small:** short imperative [`CLAUDE.md`](../../CLAUDE.md); long standards live in `docs/human/` and load via Toolshed `get_rules` or path-scoped rules — see **`docs/human/agent-context-power-user-stack.md`** (*Cursor alignment*). **In the agent-context-kit monorepo** (no `docs/human/` at repo root), use **`template/docs/human/agent-context-power-user-stack.md`**.
@@ -15,13 +19,18 @@ This project uses **agent-context-kit** in **Cursor**: layered docs under `docs/
 - **Few MCP servers:** Cursor **Settings → MCP** — prefer Toolshed plus a small set of justified servers (each adds tool schemas to context).
 - **Hooks (optional):** [Cursor Hooks](https://docs.cursor.com/agent/hooks) — **`.cursor/hooks.json`** (created by **`context-kit init`**, starts with an empty `hooks` object) and **`.cursor/hooks/README.md`**; add scripts under **`.cursor/hooks/`** when needed. Pair with `manifest.yaml` **guardrails** and Toolshed approval tools where configured.
 
-## Required startup behavior
+## MANDATORY INITIALIZATION PROTOCOL
 
-For any non-trivial request, do not jump straight to code or a generic answer.
+Before writing any code, proposing changes, or answering any technical query, you MUST perform the following initialization in order.
 
-- If **Toolshed MCP tools are available**, start with the MCP sequence below.
-- If **Toolshed MCP tools are not available**, immediately fall back to the file-reading sequence below.
-- If neither path is possible because files or tools are missing, say that explicitly before proceeding.
+1. **Read Documentation Index**: open `docs/README.md`. Identify the feature register and the workflow prompt most relevant to the current task.
+2. **Verify Core Principles**: read `docs/agent/values.md`. Every architectural and implementation decision must align with these values.
+3. **Load Context Tiers**: read `docs/agent/context-policy.md` and load **L0 + L1** for this task. Read `docs/agent/app-config.md` to resolve project commands and paths. Open **L2** docs only when the task requires them.
+4. If **Toolshed MCP** is available, run the MCP initialization sequence below after steps 1-3 to verify orientation and pull only the needed L2 resources.
+5. If **Toolshed MCP** is not available, continue with the fallback file-reading sequence below after steps 1-3.
+6. If tools or files are missing, say that explicitly before proceeding.
+
+Do not skip initialization for "small" tasks, bug fixes, reviews, or implementation questions.
 
 After the startup step, **infer the workflow from the user's task message even when they did not name a prompt explicitly**. Treat the task wording as the router input.
 
@@ -53,13 +62,34 @@ If the task matches one row strongly, proceed with that workflow automatically. 
 - Use `docs/README.md` as the dispatcher when the task could fit more than one workflow.
 - If the task is trivial but still changes code, at minimum load L0 and the nearest workflow context before editing.
 
+## Execution style
+
+For non-trivial tasks:
+
+- Explain the architectural reason for the chosen change before or alongside implementation.
+- Call out important constraints, non-goals, and failure modes from the loaded docs.
+- Keep code and validation traceable to the selected workflow prompt and feature/spec context.
+
+Do not invent requirements that were not found in the loaded docs or clarified by the user.
+
+## Quality gate
+
+When code changes are made, the task is not complete until all applicable checks pass:
+
+1. Run the project's canonical validation commands from `docs/agent/app-config.md`.
+2. Add or update tests for fixes and features unless the task is docs-only.
+3. Keep the scope limited to the requested change.
+4. Update relevant docs when behavior, contracts, or status changed.
+
+If the request is ambiguous or contradicts the loaded docs, stop and ask for clarification.
+
 ## If Toolshed MCP is connected
 
 At the **start** of a substantive session (or before a large change):
 
-1. Call **`get_project_identity`** — L0: values, architecture primer, glossary.
-2. Call **`get_guardrails`** — blocked actions, approval requirements, allowed domains (if configured).
-3. Before **coding or review**, call **`get_rules`** (optional `standard` if you only need one, e.g. `testing`).
+1. Call **`get_project_identity`** to verify L0 identity files.
+2. Call **`get_guardrails`** to load blocked actions and approval requirements.
+3. Call **`get_rules`** before coding or review. Use `standard` selectively when one named standard is enough.
 4. For **feature work**, call **`list_registry`**, then **`get_spec`** with the feature `name` — do **not** load every feature spec.
 5. For **terminology**, use **`lookup_glossary`** before naming new APIs or types.
 6. For **prompt templates**, use **`list_prompts`** / **`get_prompt`** when relevant.
@@ -74,7 +104,7 @@ If a tool fails (missing file), say so briefly and continue with what you can re
 
 ## If MCP is not available
 
-Read in order: `docs/README.md`, `docs/agent/values.md`, `docs/agent/app-config.md`, `docs/agent/architecture-primer.md`, `docs/agent/glossary.md`, then `docs/agent/context-policy.md`, then `docs/agent/key-learnings.md` as needed. Use `docs/features/` only for the feature you are working on. Read `guardrails` in `manifest.yaml` if present.
+Read in order: `docs/README.md`, `docs/agent/values.md`, `docs/agent/context-policy.md`, `docs/agent/app-config.md`, then the minimum L0 files needed for the task such as `docs/agent/architecture-primer.md` and `docs/agent/glossary.md`. Open `docs/agent/key-learnings.md` and `docs/features/` only for the feature you are working on. Read `guardrails` in `manifest.yaml` if present.
 
 ## Discipline
 

@@ -16,6 +16,8 @@ Paths listed under `rules.standards` in `manifest.yaml` (for example `docs/human
 - **`toolshed-mcp-setup.md`** — how to register `@agent-context-kit/toolshed-server` in Cursor, Claude Desktop, and related clients (`cwd`, `--manifest`, `--profile`, aliases, troubleshooting).
 - **`agent-context-power-user-stack.md`** — layered stack (short root memory, path rules, Plan mode, few MCPs, hooks, worktrees) with a **Cursor-first** table and `.mdc` `globs` example; Claude Code maps to `.claude/` where relevant.
 
+For Cursor, the canonical always-on bootstrap rule in this template is `.cursor/rules/agent-context-kit.mdc`. Treat other `.cursor/rules/*.mdc` files as optional workflow add-ons or path-scoped extensions.
+
 ## Related
 
 - Machine-oriented rules: `docs/agent/context-policy.md`

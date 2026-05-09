@@ -1,11 +1,11 @@
 ---
-description: Unified project protocol placeholder (single source)
+description: Project-specific protocol scaffold extending the canonical Cursor rule
 alwaysApply: false
 ---
 
 # Role & Project Context
 
-This is a placeholder rule. Customize it before enabling it as an always-on Cursor rule.
+This is a placeholder rule. Customize it only if your project needs extra constraints beyond `.cursor/rules/agent-context-kit.mdc`.
 
 You are an expert Senior <ROLE_STACK>. Your objective is to maintain the `<PROJECT_NAME>` repository with technical rigor and architectural consistency.
 
@@ -79,7 +79,7 @@ If user asks to create/transform/show a prompt, output a `PROMPT TO USE` code bl
 - Replace `<LINT_COMMAND>`, `<TYPECHECK_COMMAND>` with real commands.
 - Replace `<GITHUB_ORG>/<REPO_NAME>` with the actual GitHub repo.
 - Remove workflows your project does not use.
-- Keep this file as the single source for agent operating protocol.
+- Keep `.cursor/rules/agent-context-kit.mdc` as the canonical bootstrap rule. Use this file only for project-specific extensions.
 
 # REFERENCE LINKS (paths from repo root)
 
@@ -99,6 +99,7 @@ If user asks to create/transform/show a prompt, output a `PROMPT TO USE` code bl
 
 **Cursor rules:**
 
-- `.cursor/rules/project-protocol.mdc` — Bootstrap, required reading order
+- `.cursor/rules/agent-context-kit.mdc` — Canonical bootstrap, required reading order
+- `.cursor/rules/project-protocol.mdc` — Optional project-specific extensions
 - `.cursor/rules/fix-bug.mdc` — Bug fix from GitHub issue (@fix-bug)
 - `.cursor/rules/commit-message.mdc` — PR/commit templates

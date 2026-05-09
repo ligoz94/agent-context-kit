@@ -6,7 +6,7 @@ This page relates a **layered agent setup** (short root memory, path rules, plan
 
 | Power-user idea | What you do in **Cursor** |
 |-----------------|---------------------------|
-| Short always-on memory | Keep **[`CLAUDE.md`](../../CLAUDE.md)** (and optional `AGENTS.md`) **small and imperative**. Put depth in **`docs/human/`** and Toolshed, not in an ever-growing catch-all rule file. |
+| Short always-on memory | Keep **[`CLAUDE.md`](../../CLAUDE.md)** (and optional `AGENTS.md`) **small and imperative**. Put depth in **`docs/human/`** and Toolshed, not in an ever-growing catch-all rule file. For Cursor, prefer one canonical bootstrap rule and keep extra rules path-scoped or optional. |
 | Path-scoped rules (low ambient cost) | Add **`.cursor/rules/*.mdc`**. Use frontmatter **`globs`** (e.g. `globs: src/api/**/*.ts`) and **`alwaysApply: false`** so the rule applies when those paths are in play, not every chat. Keep **`alwaysApply: true`** for repo-wide workflow rules (e.g. this kit’s Toolshed rule). |
 | Plan before risky edits | Use **[Plan mode](https://www.cursor.com/docs/agent/modes)** (Shift+Tab in the agent input, or the mode picker), or Ask mode for exploration-only; pair with [`context-policy.md`](../agent/context-policy.md) for L1/L2 loading. |
 | Few MCP servers | **Cursor Settings → MCP**: enable **Toolshed** plus only servers you need. Each server adds tool schemas to context — same trade-off as “many MCPs” in any client. |
@@ -94,4 +94,4 @@ Hooks and guardrails **complement** each other: hooks enforce at the shell/tool 
 - [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) — `.mdc` frontmatter, `globs`, `alwaysApply`
 - [Cursor Hooks](https://docs.cursor.com/agent/hooks) — project **`.cursor/hooks.json`** (scaffolded on `init`)
 
-Inspired in part by public write-ups on tuning agent setups (short root memory, path rules, few MCP servers, hooks, worktrees). Your stack should match **your** repo — this page is a map, not a mandate. **In Cursor:** follow [Cursor alignment](#cursor-alignment) and [`.cursor/rules/agent-context-kit.mdc`](../../.cursor/rules/agent-context-kit.mdc) as the default wiring for this template.
+Inspired in part by public write-ups on tuning agent setups (short root memory, path rules, few MCP servers, hooks, worktrees). Your stack should match **your** repo — this page is a map, not a mandate. **In Cursor:** follow [Cursor alignment](#cursor-alignment) and [`.cursor/rules/agent-context-kit.mdc`](../../.cursor/rules/agent-context-kit.mdc) as the canonical always-on rule for this template. Treat other `.mdc` files as optional or path-scoped extensions.

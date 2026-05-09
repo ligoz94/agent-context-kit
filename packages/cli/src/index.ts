@@ -19,6 +19,7 @@ import {
   mkdirSync,
   readdirSync,
   statSync,
+  realpathSync,
 } from "fs";
 import { resolve, join, relative, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -28,16 +29,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** Published layout: `cli/template` next to `cli/dist`. Monorepo: repo root `template/`. */
 export function findTemplateDir(): string {
-  const candidates = [
-    resolve(__dirname, "../template"),
-    resolve(__dirname, "../../../template"),
-  ];
+  const candidates = [resolve(__dirname, "../template"), resolve(__dirname, "../../../template")];
   for (const c of candidates) {
     if (existsSync(join(c, "manifest.yaml"))) return c;
   }
-  throw new Error(
-    `Template not found. Tried:\n  ${candidates.join("\n  ")}`,
-  );
+  throw new Error(`Template not found. Tried:\n  ${candidates.join("\n  ")}`);
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
@@ -192,14 +188,8 @@ export function cmdInit(cwd: string = process.cwd()) {
   );
 
   copyTemplateDirFiles(templateDir, ".cursor/rules", cwd);
-  copyTemplate(
-    join(templateDir, ".cursor/hooks.json"),
-    join(cwd, ".cursor/hooks.json"),
-  );
-  copyTemplate(
-    join(templateDir, ".cursor/hooks/README.md"),
-    join(cwd, ".cursor/hooks/README.md"),
-  );
+  copyTemplate(join(templateDir, ".cursor/hooks.json"), join(cwd, ".cursor/hooks.json"));
+  copyTemplate(join(templateDir, ".cursor/hooks/README.md"), join(cwd, ".cursor/hooks/README.md"));
   copyTemplate(join(templateDir, "CLAUDE.md"), join(cwd, "CLAUDE.md"));
 
   console.log("");
@@ -378,10 +368,7 @@ export function cmdNewSpec(name?: string, cwd: string = process.cwd()) {
   let templateContent = "";
   try {
     templateContent = readFileSync(templatePath, "utf8");
-    templateContent = templateContent.replace(
-      /# Feature: <feature-name>/,
-      `# Feature: ${name}`,
-    );
+    templateContent = templateContent.replace(/# Feature: <feature-name>/, `# Feature: ${name}`);
     writeFileSync(destPath, templateContent, "utf8");
     ok(`Created spec: docs/features/${name}.md`);
   } catch (e) {
@@ -479,11 +466,14 @@ export function detectProjectInfo(cwd: string): DetectedInfo {
       if (deps["hono"]) stack.push("hono");
       if (deps["prisma"] || deps["@prisma/client"]) stack.push("prisma");
       if (deps["drizzle-orm"]) stack.push("drizzle");
-      if (deps["postgres"] || deps["pg"] || deps["@neondatabase/serverless"]) stack.push("postgres");
+      if (deps["postgres"] || deps["pg"] || deps["@neondatabase/serverless"])
+        stack.push("postgres");
       if (deps["mysql2"]) stack.push("mysql");
       if (deps["mongoose"]) stack.push("mongodb");
       if (deps["redis"] || deps["ioredis"]) stack.push("redis");
-    } catch { /* ignore parse errors */ }
+    } catch {
+      /* ignore parse errors */
+    }
   }
 
   if (existsSync(join(cwd, "go.mod"))) {
@@ -493,7 +483,9 @@ export function detectProjectInfo(cwd: string): DetectedInfo {
         const mod = readFileSync(join(cwd, "go.mod"), "utf8");
         const m = mod.match(/^module (.+)/m);
         if (m) name = m[1].split("/").pop() ?? name;
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -507,7 +499,9 @@ export function detectProjectInfo(cwd: string): DetectedInfo {
       const cargo = readFileSync(join(cwd, "Cargo.toml"), "utf8");
       const m = cargo.match(/^name\s*=\s*"([^"]+)"/m);
       if (m) name = m[1];
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   if (existsSync(join(cwd, "pom.xml"))) language = "java";
@@ -558,7 +552,10 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
     `  Stack, comma-separated${stackDefault ? ` [${stackDefault}]` : ""}: `,
   );
   const stack = stackInput
-    ? stackInput.split(",").map((s) => s.trim()).filter(Boolean)
+    ? stackInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
     : detected.stack;
 
   console.log("");
@@ -595,10 +592,7 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
     }
     raw = raw.replace(/language:\s*"[^"]*"/, `language: "${language}"`);
     if (stack.length > 0) {
-      raw = raw.replace(
-        /stack:\s*\[\]/,
-        `stack: [${stack.map((s) => `"${s}"`).join(", ")}]`,
-      );
+      raw = raw.replace(/stack:\s*\[\]/, `stack: [${stack.map((s) => `"${s}"`).join(", ")}]`);
     }
     writeFileSync(manifestPath, raw);
     ok("manifest.yaml");
@@ -636,7 +630,10 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
   if (existsSync(glossaryPath) && termsRaw) {
     try {
       let content = readFileSync(glossaryPath, "utf8");
-      const pairs = termsRaw.split(";").map((s) => s.trim()).filter(Boolean);
+      const pairs = termsRaw
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const rows = pairs.map((p) => {
         const colonIdx = p.indexOf(":");
         if (colonIdx === -1) return `| ${p} | |`;
@@ -685,7 +682,14 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
 // ── Router ────────────────────────────────────────────────────────────────────
 
 // Only run as CLI entry point (not when imported by tests)
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+function resolveArgv1(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolveArgv1(process.argv[1])) {
   const [, , command] = process.argv;
 
   if (command === "--help" || command === "-h" || !command) {
@@ -698,10 +702,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       cmdInit();
       break;
     case "setup":
-      cmdSetup().then(() => process.exit(0)).catch((e) => {
-        fail((e as Error).message);
-        process.exit(1);
-      });
+      cmdSetup()
+        .then(() => process.exit(0))
+        .catch((e) => {
+          fail((e as Error).message);
+          process.exit(1);
+        });
       break;
     case "sync":
       cmdSync();

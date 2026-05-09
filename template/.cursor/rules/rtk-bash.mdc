@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+# RTK for bash / terminal commands
+
+When running terminal commands in this repo, **prefer RTK** (`rtk` on PATH) to reduce noisy output and token usage: use the `rtk <subcommand> …` form documented by `rtk --help`.
+
+Examples:
+
+- `git status` → `rtk git status`
+- `npm run build` → `rtk npm run build`
+- `npx eslint .` → `rtk npx eslint .`
+- `grep -R foo src` → `rtk grep …` when appropriate
+- `find . -name '*.ts'` → `rtk find …`
+
+**RTK is not required** (use the command directly) for: `cd`, environment variables, `which` / `command -v`, pipelines where byte-identical output matters, or commands with no RTK wrapper. If `rtk <subcmd>` fails or no wrapper exists, rerun without `rtk`.
+
+For the canonical form of a command: `rtk rewrite "<raw command>"` (stdout is the suggested command).
+
+## Authoritative list and docs
+
+- **Full command surface**: run `rtk --help` on the installed binary; it is the source of truth for subcommands and routers.
+- **Upstream**: [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk)
+
+## Typical RTK routers (non-exhaustive)
+
+- **Files**: `ls`, `read`, `smart`, `find`, `grep`, `diff`
+- **Git / GitHub CLI**: `git …`, `gh …`
+- **Tests / builds**: `test`, `err`, `vitest`, `playwright`, `pytest`, `tsc`, `lint`, `prettier`
+- **Packages**: `npm`, `pnpm`, `pip`, `bundle`, `prisma`
+- **Infra**: `docker`, `kubectl`, `aws`
+- **Utilities**: `json`, `deps`, `env`, `log`, `curl`, `wget`, `summary`, `proxy`
+- **Analytics / setup**: `gain`, `discover`, `session`, `init`, `hook`

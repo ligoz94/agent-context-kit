@@ -8,7 +8,7 @@ Inspired by Stripe’s Developer Toolshed pattern. Language-agnostic, editor-agn
 
 ## The problem
 
-Agents start cold: either you paste too much (noisy, expensive) or too little (generic or wrong architecture). There is no shared convention for *what this project is*, *how we work*, and *what must never happen*.
+Agents start cold: either you paste too much (noisy, expensive) or too little (generic or wrong architecture). There is no shared convention for _what this project is_, _how we work_, and _what must never happen_.
 
 ## The solution
 
@@ -16,12 +16,12 @@ Agents start cold: either you paste too much (noisy, expensive) or too little (g
 
 ### Context layers
 
-| Layer | Role | Typical content |
-|-------|------|-----------------|
-| **L0 — Identity** | Baseline orientation | Values, architecture primer, glossary |
-| **L1 — Rules** | How we build and review | Context policy, team standards |
-| **L2 — Knowledge** | On-demand depth | Feature specs, learnings, extra doc trees |
-| **L3 — Task** | Immediate work | Chat, open files, terminal (you / the IDE) |
+| Layer              | Role                    | Typical content                            |
+| ------------------ | ----------------------- | ------------------------------------------ |
+| **L0 — Identity**  | Baseline orientation    | Values, architecture primer, glossary      |
+| **L1 — Rules**     | How we build and review | Context policy, team standards             |
+| **L2 — Knowledge** | On-demand depth         | Feature specs, learnings, extra doc trees  |
+| **L3 — Task**      | Immediate work          | Chat, open files, terminal (you / the IDE) |
 
 The **manifest** (`manifest.yaml`) is the single source of truth: paths, registry, prompts, optional **guardrails**, and optional **profiles** for different agents or sub-teams.
 
@@ -55,11 +55,13 @@ npx @agent-context-kit/cli setup
 ```
 
 The wizard will:
+
 - Detect your language and stack from `package.json`, `go.mod`, `pyproject.toml`, `Cargo.toml`, etc.
 - Prompt for a project description, architecture overview, key source paths, domain glossary terms, and project-specific rules
 - Write your answers directly into `manifest.yaml`, `architecture-primer.md`, `glossary.md`, and `values.md`
 
 Or fill in manually:
+
 - `manifest.yaml` — project name, stack, registry entries, optional `guardrails` and `profiles`
 - `docs/agent/values.md`, `glossary.md`, `architecture-primer.md` — L0
 - `docs/agent/context-policy.md` — L1 loading and tone
@@ -120,46 +122,46 @@ Canonical names below; aliases from `manifest.yaml` → `toolshed.tool_aliases` 
 
 ### Read context
 
-| Tool | Purpose |
-|------|---------|
-| `get_project_identity` | L0: values, architecture primer, glossary |
-| `get_guardrails` | Blocked actions, `require_approval` list, `allowed_domains` |
-| `get_rules` | L1: context policy + standards (`standard` optional) |
-| `get_learnings` | L2: `key-learnings.md` |
-| `get_spec` | One feature spec from `registry` (`name`) |
-| `list_registry` | All registered features and statuses |
-| `lookup_glossary` | Term lookup (`term` optional) |
-| `get_prompt` | Prompt template + optional `variables` for `{{placeholders}}` |
-| `list_prompts` | Available prompt files |
-| `search_context` | Search across configured paths for a string/regex |
+| Tool                   | Purpose                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| `get_project_identity` | L0: values, architecture primer, glossary                     |
+| `get_guardrails`       | Blocked actions, `require_approval` list, `allowed_domains`   |
+| `get_rules`            | L1: context policy + standards (`standard` optional)          |
+| `get_learnings`        | L2: `key-learnings.md`                                        |
+| `get_spec`             | One feature spec from `registry` (`name`)                     |
+| `list_registry`        | All registered features and statuses                          |
+| `lookup_glossary`      | Term lookup (`term` optional)                                 |
+| `get_prompt`           | Prompt template + optional `variables` for `{{placeholders}}` |
+| `list_prompts`         | Available prompt files                                        |
+| `search_context`       | Search across configured paths for a string/regex             |
 
 ### Validate & persist
 
-| Tool | Purpose |
-|------|---------|
-| `validate_context` | Check manifest paths exist |
-| `add_learning` | Append a bullet to `key-learnings.md` |
-| `add_glossary_term` | Append term + definition to `glossary.md` |
+| Tool                    | Purpose                                        |
+| ----------------------- | ---------------------------------------------- |
+| `validate_context`      | Check manifest paths exist                     |
+| `add_learning`          | Append a bullet to `key-learnings.md`          |
+| `add_glossary_term`     | Append term + definition to `glossary.md`      |
 | `update_feature_status` | Update a feature’s `status` in `manifest.yaml` |
 
 ### Safety & verification
 
-| Tool | Purpose |
-|------|---------|
-| `request_human_approval` | Structured pause before risky actions (pair with `require_approval`) |
-| `verify_action` | Post-checks: file exists/contains/mtime, command, HTTP status, JSON path, etc. |
+| Tool                     | Purpose                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `request_human_approval` | Structured pause before risky actions (pair with `require_approval`)           |
+| `verify_action`          | Post-checks: file exists/contains/mtime, command, HTTP status, JSON path, etc. |
 
 ---
 
 ## CLI reference
 
-| Command | Description |
-|---------|-------------|
-| `context-kit init` | Scaffold manifest and docs (skips existing files) |
-| `context-kit setup` | Interactive wizard: auto-detect stack, fill project sections |
-| `context-kit check` | Required files + rough L0 token warnings |
-| `context-kit sync` | Refresh **engine** regions in agent markdown; **project** regions stay yours |
-| `context-kit list` | Lists prompts and feature markdown files under `docs/features/` |
+| Command                       | Description                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `context-kit init`            | Scaffold manifest and docs (skips existing files)                                       |
+| `context-kit setup`           | Interactive wizard: auto-detect stack, fill project sections                            |
+| `context-kit check`           | Required files + rough L0 token warnings                                                |
+| `context-kit sync`            | Refresh **engine** regions in agent markdown; **project** regions stay yours            |
+| `context-kit list`            | Lists prompts and feature markdown files under `docs/features/`                         |
 | `context-kit new-spec <name>` | Creates `docs/features/<name>.md` from the template and adds a `registry` entry (`wip`) |
 
 ### Engine vs project regions (sync)
@@ -176,21 +178,55 @@ Your content lives between:
 
 ### Token budget hints (`check`)
 
-| Layer | Target | Warn above (approx.) |
-|-------|--------|------------------------|
+| Layer               | Target       | Warn above (approx.)   |
+| ------------------- | ------------ | ---------------------- |
 | L0 (identity files) | < 800 tokens | ~800 tokens/file check |
-| L1 | team choice | — |
-| L2 per spec | keep focused | — |
+| L1                  | team choice  | —                      |
+| L2 per spec         | keep focused | —                      |
+
+---
+
+## Token-saving tools
+
+`context-kit init` asks whether to enable two optional tools that cut token usage without sacrificing accuracy. Answer **y** and they are wired in automatically for your editor.
+
+### caveman — ~65% fewer output tokens
+
+[github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)
+
+Makes agents respond in compressed, fragment-style prose. Technical accuracy is fully preserved; only filler, articles, and hedging are dropped.
+
+| Editor            | What `init` does                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| **Cursor**        | Writes `.cursor/rules/caveman.mdc` (`alwaysApply: true`) — auto-starts on restart          |
+| **Claude Code**   | Prints the one-time install command: `claude plugin marketplace add JuliusBrussee/caveman` |
+| **Codex / other** | Prints: `npx skills add JuliusBrussee/caveman`                                             |
+
+Activate mid-session: `/caveman` (or `/caveman lite` / `/caveman ultra`).
+Deactivate: "normal mode".
+
+### RTK — compressed terminal output
+
+[github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk)
+
+Wraps common CLI tools (`git`, `npm`, `grep`, `find`, …) to emit only the signal, stripping noise from terminal output. Fewer terminal tokens injected back into context.
+
+| Editor          | What `init` does                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Cursor**      | Writes `.cursor/rules/rtk-bash.mdc` (`alwaysApply: true`) — agent prefixes commands with `rtk` automatically |
+| **All editors** | RTK binary must be installed separately — see [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk)         |
+
+Usage: `git status` → `rtk git status`. Falls back to raw command when no RTK wrapper exists.
 
 ---
 
 ## Monorepo packages
 
-| Package | Role |
-|---------|------|
-| `@agent-context-kit/cli` | `context-kit` commands |
-| `@agent-context-kit/toolshed-server` | stdio MCP server |
-| `@agent-context-kit/langchain` | LangChain tools + LangSmith helpers |
+| Package                              | Role                                |
+| ------------------------------------ | ----------------------------------- |
+| `@agent-context-kit/cli`             | `context-kit` commands              |
+| `@agent-context-kit/toolshed-server` | stdio MCP server                    |
+| `@agent-context-kit/langchain`       | LangChain tools + LangSmith helpers |
 
 Examples:
 

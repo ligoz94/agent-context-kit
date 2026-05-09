@@ -209,3 +209,50 @@ context-kit check    # validates required files, L0 token budgets, CLAUDE.md siz
 context-kit list     # shows available prompts and registered features
 context-kit sync     # updates engine regions if you upgrade the kit version
 ```
+
+---
+
+## Token-saving tools (optional)
+
+Two tools that meaningfully cut token usage with no accuracy loss. `context-kit init` will ask if you want them; choose **y** and they get wired in automatically.
+
+### caveman — fewer output tokens (~65% average)
+
+[github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman)
+
+Makes the agent respond in compressed, fragment-style prose. Full technical accuracy kept; only articles, filler, and hedging are dropped. Activates with `/caveman`, deactivates with "normal mode".
+
+| Level | Command | Effect |
+|-------|---------|--------|
+| Lite | `/caveman lite` | Drop filler, keep grammar |
+| Full | `/caveman full` | Default — fragments, short synonyms |
+| Ultra | `/caveman ultra` | Maximum compression, telegraphic |
+
+**Cursor** → auto-activated via `.cursor/rules/caveman.mdc` (written by `init`).
+
+**Claude Code** → install once:
+```bash
+claude plugin marketplace add JuliusBrussee/caveman
+claude plugin install caveman@caveman
+```
+
+**Other agents (Codex, Copilot, …)**:
+```bash
+npx skills add JuliusBrussee/caveman
+```
+
+### RTK — compressed terminal output
+
+[github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk)
+
+Wraps common CLI tools (`git`, `npm`, `grep`, `find`, …) to emit only the signal, not the noise. Less terminal output = fewer tokens injected back into context.
+
+**Cursor** → auto-activated via `.cursor/rules/rtk-bash.mdc` (written by `init`). Agent will prefix commands with `rtk` automatically.
+
+**All editors** → install the binary:
+```bash
+# see https://github.com/rtk-ai/rtk for install instructions
+rtk --help    # list of routed commands
+```
+
+Usage pattern: `git status` → `rtk git status`. If no RTK wrapper exists, fall back to the raw command.

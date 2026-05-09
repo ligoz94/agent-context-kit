@@ -27,15 +27,37 @@ import { createInterface } from "readline";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-/** One-shot interactive question — resolves on Enter. */
-function ask(question: string): Promise<string> {
+/**
+ * Interactive question helper.
+ * Works with both TTY (interactive) and piped stdin (testing / scripted use).
+ * When piped, readline fires line events immediately — we queue them and dequeue per question.
+ */
+const _lineQueue: string[] = [];
+const _lineWaiters: Array<(line: string) => void> = [];
+let _rlInit = false;
+
+function initRL() {
+  if (_rlInit) return;
+  _rlInit = true;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((res) =>
-    rl.question(question, (ans) => {
-      rl.close();
-      res(ans.trim());
-    }),
-  );
+  rl.on("line", (line) => {
+    if (_lineWaiters.length > 0) {
+      _lineWaiters.shift()!(line.trim());
+    } else {
+      _lineQueue.push(line.trim());
+    }
+  });
+  rl.on("close", () => {
+    // Drain any remaining waiters with empty string
+    for (const w of _lineWaiters.splice(0)) w("");
+  });
+}
+
+function ask(question: string): Promise<string> {
+  initRL();
+  process.stdout.write(question);
+  if (_lineQueue.length > 0) return Promise.resolve(_lineQueue.shift()!);
+  return new Promise((res) => _lineWaiters.push(res));
 }
 
 /** Published layout: `cli/template` next to `cli/dist`. Monorepo: repo root `template/`. */
@@ -162,6 +184,15 @@ export async function cmdInit(cwd: string = process.cwd()) {
   const installCursor = choice === "cursor" || choice === "all";
   const installCodex = choice === "codex" || choice === "all";
 
+  // ── Ask about token-saving tools ────────────────────────────────────────
+  const tokenAnswer = await ask(
+    "\x1b[36m[context-kit]\x1b[0m Enable token-saving tools? (caveman ~75% fewer output tokens + RTK shorter terminal output)\n" +
+      "  y) Yes — set up caveman & RTK\n" +
+      "  n) No\n" +
+      "  Choice [y]: ",
+  );
+  const installTokenTools = tokenAnswer !== "n" && tokenAnswer !== "no";
+
   log("Initialising agent-context-kit...");
 
   copyTemplate(join(templateDir, "manifest.yaml"), join(cwd, "manifest.yaml"));
@@ -241,7 +272,14 @@ export async function cmdInit(cwd: string = process.cwd()) {
   if (installCursor) {
     ensureDir(join(cwd, ".cursor/rules"));
     ensureDir(join(cwd, ".cursor/hooks"));
-    copyTemplateDirFiles(templateDir, ".cursor/rules", cwd);
+    copyTemplateDirFiles(
+      templateDir,
+      ".cursor/rules",
+      cwd,
+      installTokenTools
+        ? new Set([".gitkeep"])
+        : new Set([".gitkeep", "caveman.mdc", "rtk-bash.mdc"]),
+    );
     copyTemplate(join(templateDir, ".cursor/hooks.json"), join(cwd, ".cursor/hooks.json"));
     copyTemplate(
       join(templateDir, ".cursor/hooks/README.md"),
@@ -276,14 +314,40 @@ export async function cmdInit(cwd: string = process.cwd()) {
   }
 
   console.log("");
-  log("Done. Next steps:");
-  console.log("  1. Run: context-kit setup  (auto-fills all docs + MCP configs)");
-  console.log("  2. Or manually fill manifest.yaml — project name, stack, etc.");
-  if (installClaude) console.log("  3. Review CLAUDE.md and trim it to your project");
-  if (installCursor) console.log("  3. Cursor: .cursor/rules/*.mdc — review generated rules");
-  if (installCodex)
-    console.log("  3. Review AGENTS.md — setup will enrich it with project context");
-  console.log("  4. Run: npx @agent-context-kit/toolshed-server");
+  log("Step 1 of 3 complete. Run next:");
+  console.log("");
+  console.log("  \x1b[1m2. npx @agent-context-kit/cli setup\x1b[0m");
+  console.log("     Auto-detects your stack and fills docs + MCP config files.");
+  console.log("");
+  console.log("  Then step 3 — tell your AI agent:");
+  console.log(
+    "  \x1b[2mRead docs/agent/prompts/populate-project.md and populate all project docs.\x1b[0m",
+  );
+  console.log("");
+  if (installClaude)
+    console.log("  Note: .mcp.json was created — restart Claude Code to activate Toolshed MCP.");
+  if (installCursor)
+    console.log("  Note: .cursor/mcp.json was created — restart Cursor to activate Toolshed MCP.");
+  if (installTokenTools) {
+    console.log("");
+    log("Token-saving tools setup:");
+    if (installCursor) {
+      console.log(
+        "  ✓ Cursor: caveman.mdc + rtk-bash.mdc written to .cursor/rules/ (auto-activate on restart)",
+      );
+      console.log("    RTK install: https://github.com/rtk-ai/rtk");
+    }
+    if (installClaude) {
+      console.log("  Claude Code — run once to install caveman plugin:");
+      console.log("    \x1b[2mclaude plugin marketplace add JuliusBrussee/caveman\x1b[0m");
+      console.log("    \x1b[2mclaude plugin install caveman@caveman\x1b[0m");
+      console.log("    RTK install: https://github.com/rtk-ai/rtk");
+    }
+    if (installCodex && !installClaude && !installCursor) {
+      console.log("  Run once to install caveman:");
+      console.log("    \x1b[2mnpx skills add JuliusBrussee/caveman\x1b[0m");
+    }
+  }
 }
 
 export function cmdSync(cwd: string = process.cwd()) {
@@ -1638,14 +1702,18 @@ export async function cmdSetup(cwd: string = process.cwd()): Promise<void> {
   }
 
   console.log("");
-  log("Done. Review and refine:");
-  console.log("  - manifest.yaml                       add detail to description");
-  console.log("  - docs/agent/architecture-primer.md   data model, routes, key paths");
-  console.log("  - docs/agent/glossary.md              add domain-specific terms");
-  console.log("  - docs/agent/values.md                refine project rules");
-  console.log("  - docs/agent/context-policy.md        refine context loading rules");
-  console.log("  - docs/agent/key-learnings.md         add real learnings as you go");
-  console.log("  context-kit check");
+  log("Step 2 of 3 complete. Run next:");
+  console.log("");
+  console.log("  \x1b[1m3. Tell your AI agent (in your editor):\x1b[0m");
+  console.log("");
+  console.log("  \x1b[2mRead docs/agent/prompts/populate-project.md\x1b[0m");
+  console.log("  \x1b[2mand populate all project docs.\x1b[0m");
+  console.log("");
+  console.log("  The agent will scan your codebase, fill all template files,");
+  console.log("  then ask you 4 questions it can't infer from code.");
+  console.log("");
+  console.log("  After that: context-kit check");
+  console.log("  Then open docs/README.md to start developing.");
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────

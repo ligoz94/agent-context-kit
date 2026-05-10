@@ -233,6 +233,90 @@ This creates a persistent mission state, executes slices, records validator find
 
 ---
 
+## Practical chat patterns
+
+The kit is most useful when the team standardizes not only the docs and tools, but also the way people ask for work in chat.
+
+There are three common patterns worth making explicit.
+
+### 1. Prompt generation
+
+Use this when the user knows the goal but not the best execution prompt.
+
+Examples:
+
+```text
+prompt: create a strong prompt to implement shopping-cart coupons
+
+prompt: fix a regression in verify_action and include acceptance criteria
+```
+
+Expected outcome:
+
+- stronger task framing,
+- explicit constraints,
+- recommended reading,
+- recommended tools,
+- clearer acceptance criteria.
+
+### 2. Task routing
+
+Use this when the user is unsure which workflow, docs, or tools should be used.
+
+Examples:
+
+```text
+route: issue #1234 is about checkout coupons. Which workflow, docs, and tools should I use?
+
+route: review PR #5678 and tell me the right review flow
+```
+
+Expected outcome:
+
+- recommendation for classic workflow vs mission workflow,
+- the right prompt file under `docs/agent/prompts/`,
+- the right specs or standards to load,
+- the right MCP tools to call first.
+
+If your editor supports custom chat shortcuts, teams often also adopt conventions like:
+
+```text
+/implement-feature shopping-cart-coupons
+/review-pr 5678
+/fix-bug 1234
+```
+
+These are workflow conventions, not built-in CLI commands from this library.
+The source of truth remains the prompt files and rules in the repository.
+
+### 3. Canonical PR body generation
+
+Use this when opening a PR or rewriting a weak PR description.
+
+The canonical template lives at `docs/agent/templates/pr-body.md`.
+
+Examples:
+
+```text
+Read docs/agent/templates/pr-body.md and write the PR body for this branch.
+
+Generate a PR description using the canonical PR body template.
+
+Fill the PR body template for issue #1234 and this implementation.
+```
+
+Some teams also use a shortcut-style convention such as:
+
+```text
+/body-pr
+/body-pr 1234
+```
+
+Again, this is a workflow shortcut, not a built-in CLI command.
+What matters is that every PR is generated from the same template, so reviewers always get the same structure for summary, root cause, intent, risk, assumptions, handoff, agent report, and test plan.
+
+---
+
 ## Tools reference (MCP & LangChain)
 
 Canonical names below; aliases from `manifest.yaml` → `toolshed.tool_aliases` apply everywhere.

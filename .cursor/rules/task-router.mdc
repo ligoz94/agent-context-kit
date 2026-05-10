@@ -1,0 +1,133 @@
+---
+description: Route a user request to the right prompt, docs, tools, and workflow before execution
+alwaysApply: false
+---
+
+# Task Router
+
+Use this rule when the user is asking what workflow to use, what prompt to use, what docs to read, or how the agent should approach a task.
+
+This rule is for **routing and execution planning**, not for transforming text into a polished prompt.
+
+## Activation
+
+Activate only when at least one is true:
+
+- User asks which prompt/workflow to use.
+- User asks what docs/context/tools the agent should load.
+- Message starts with `route:` or `@route`.
+- User asks how to structure the task before coding.
+
+If not active, do nothing.
+
+## Output rule
+
+When active, output in this exact order:
+
+1. `ROUTING PLAN`
+2. `RECOMMENDED PROMPT`
+3. `RECOMMENDED CONTEXT`
+4. `RECOMMENDED TOOLS`
+5. `NEXT ACTION`
+6. `MISSING CONTEXT` (max 3 blocking questions, only if needed)
+
+Keep it concise and operational.
+
+## Routing algorithm
+
+### 1. Classify the request
+
+Map the request to one primary workflow:
+
+- new feature -> `implement-feature`
+- bug / regression -> `fix-bug`
+- docs / spec change -> `update-docs`
+- pre-push validation -> `finish`
+- PR review -> `review-pr`
+- deep review -> `full-review`
+- issue triage -> `triage-issue`
+- browser validation -> `ui-test`
+- mission execution -> `mission workflow`
+
+### 2. Choose minimum context
+
+Always include:
+
+- `docs/README.md`
+- `docs/agent/values.md`
+- `docs/agent/context-policy.md`
+
+Then add only what the task needs:
+
+- feature work -> relevant feature doc + spec
+- bug fix -> relevant feature doc/spec + `docs/agent/key-learnings.md`
+- unfamiliar area -> `docs/agent/architecture-primer.md`
+- naming/domain work -> `docs/agent/glossary.md`
+- mission work -> `docs/human/mission-workflow.md` plus relevant mission feature docs
+
+### 3. Choose tool surface
+
+If Toolshed MCP is available, prefer:
+
+- `get_project_identity`
+- `get_guardrails`
+- `get_rules`
+- `list_registry`
+- `get_spec`
+- `get_learnings`
+- `lookup_glossary`
+- `search_context`
+
+Do not recommend every tool. Recommend only what the task needs.
+
+### 4. Choose execution mode
+
+Distinguish clearly:
+
+- classic workflow -> docs/prompt-driven work
+- mission workflow -> persistent state + planner -> worker -> validator loop
+
+Mission mode should be recommended only when the task is multi-step, iterative, or likely to require repair/revalidate loops.
+
+## Output template
+
+Use this structure:
+
+```md
+ROUTING PLAN
+
+- Workflow: {{classic | mission}}
+- Task type: {{bug fix | feature | docs | review | ...}}
+- Why: {{one or two lines}}
+
+RECOMMENDED PROMPT
+
+- {{prompt file name or "none"}}
+
+RECOMMENDED CONTEXT
+
+- {{path}}
+- {{path}}
+- {{path}}
+
+RECOMMENDED TOOLS
+
+- {{tool name}}
+- {{tool name}}
+
+NEXT ACTION
+
+- {{exact next step the user or agent should take}}
+
+MISSING CONTEXT
+
+- {{only if blocking}}
+```
+
+## Constraints
+
+- Prefer the smallest correct context set.
+- Do not recommend reading the whole docs tree.
+- Do not fabricate specs, prompts, or tools that do not exist.
+- If mission workflow is not enabled for the project, say so explicitly before recommending `mission start` or `mission run`.
+- If the user asks for a prompt artifact, let `prompt-architect.mdc` handle the prompt text itself; this rule should only route.

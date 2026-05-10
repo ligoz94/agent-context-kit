@@ -1,10 +1,14 @@
 ---
 alwaysApply: false
 ---
+
 # Prompt Transformer (Pure)
 
 Convert weak/short user input into a strong, structured prompt.
 This rule is only for prompt transformation.
+
+It does **not** execute the task, fetch docs, or call tools itself.
+Its job is to produce a prompt that tells the next agent/session what to read, which tool surfaces to use, and how to validate the result.
 
 ## Activation
 
@@ -20,8 +24,8 @@ If not active, do nothing.
 
 When active, output in this exact order:
 
-1) `PROMPT TO USE` (one fenced `md` block, first thing in response)
-2) `MISSING CONTEXT` (max 3 blocking questions, only if needed)
+1. `PROMPT TO USE` (one fenced `md` block, first thing in response)
+2. `MISSING CONTEXT` (max 3 blocking questions, only if needed)
 
 No long preface before the prompt block.
 
@@ -48,20 +52,38 @@ Always compile into this structure:
 {{known facts}}
 {{unknown facts as TBD}}
 
+[RECOMMENDED READING]
+
+- docs/README.md
+- docs/agent/values.md
+- docs/agent/context-policy.md
+- {{feature doc / spec / key-learnings / TBD}}
+
+[RECOMMENDED TOOLS]
+
+- {{Toolshed MCP tools or "none"}}
+
+[RECOMMENDED PROMPT TEMPLATE]
+{{prompt file name from docs/agent/prompts or "TBD"}}
+
 [CONSTRAINTS]
+
 - {{scope limits}}
 - {{quality/safety limits}}
 - {{format limits}}
 
 [INPUTS]
+
 - {{artifacts, paths, links, or "TBD"}}
 
 [EXECUTION PLAN]
-1) {{step}}
-2) {{step}}
-3) {{step}}
+
+1. {{step}}
+2. {{step}}
+3. {{step}}
 
 [ACCEPTANCE CRITERIA]
+
 - {{testable outcome}}
 - {{testable outcome}}
 
@@ -78,3 +100,38 @@ Before returning `PROMPT TO USE`, verify:
 - Unknowns are explicit (`TBD`).
 - Acceptance criteria are testable.
 - Output format is explicit.
+- Recommended reading is minimal, not a dump of the whole docs tree.
+- Tool suggestions are relevant to the task (for example `get_project_identity`, `get_rules`, `list_registry`, `get_spec`, `get_learnings`).
+- Prompt template suggestion matches the task (`fix-bug`, `implement-feature`, `update-docs`, `finish`, `review-pr`, etc.).
+
+## agent-context-kit routing hints
+
+When this repo uses agent-context-kit, prefer these defaults inside the generated prompt:
+
+- Always start from `docs/README.md`, `docs/agent/values.md`, and `docs/agent/context-policy.md`.
+- For feature work, recommend `list_registry` then `get_spec` instead of opening every feature doc.
+- For bug work, recommend `get_learnings` before proposing a fix.
+- For terminology, recommend `lookup_glossary`.
+- For prompt choice, map:
+  - new implementation -> `implement-feature.md`
+  - bug fix -> `fix-bug.md`
+  - spec update -> `update-docs.md`
+  - pre-push validation -> `finish.md`
+  - PR review -> `review-pr.md`
+
+## Example intent
+
+If the user asks:
+
+```text
+prompt: fix a bug in the auth flow
+```
+
+the output should not just say "fix the bug".
+It should compile a prompt that points the next session toward:
+
+- the correct role,
+- the right docs,
+- the right MCP tools,
+- the right prompt template,
+- and explicit validation criteria.

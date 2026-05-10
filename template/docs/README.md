@@ -49,6 +49,7 @@ Status: `stable` | `wip` | `deprecated`
 | `agentic-development-workflow` | `stable` | End-to-end issue → spec → implement → review workflow for agent-driven delivery. | [agentic-development-workflow.md](features/agentic-development-workflow.md) |
 | `context-loading-model` | `stable` | Layered loading contract for L0/L1/L2 context, including manual reads required beyond MCP identity. | [context-loading-model.md](features/context-loading-model.md) |
 | `feature-spec-registry` | `stable` | How feature docs are registered, scaffolded, and kept in sync between `manifest.yaml` and `docs/README.md`. | [feature-spec-registry.md](features/feature-spec-registry.md) |
+| `mission-runtime` | `planned` | Proposal for evolving the kit into a mission-driven runtime with orchestrator, workers, validators, shared state, and operator workflows. | [mission-runtime/feature.md](features/mission-runtime/feature.md) |
 | `toolshed-mcp-integration` | `stable` | Toolshed setup, tool usage expectations, and MCP-specific orientation flow. | [toolshed-mcp-integration.md](features/toolshed-mcp-integration.md) |
 
 <!-- agent-context-kit:feature-register:start -->

@@ -9,6 +9,7 @@
     "build": "npm run build --workspaces --if-present",
     "build:cli": "npm run build -w @agent-context-kit/cli",
     "build:server": "npm run build -w @agent-context-kit/toolshed-server",
+    "context-kit": "node packages/cli/dist/index.js",
     "test": "vitest run --reporter=verbose",
     "test:watch": "vitest",
     "test:mcp": "npm run test:mcp -w @agent-context-kit/toolshed-server",

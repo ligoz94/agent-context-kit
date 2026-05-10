@@ -8,6 +8,13 @@ import {
   handleRequestHumanApproval,
   handleVerifyAction,
   Manifest,
+  handleCreateMission,
+  handleCreateMissionFromIssue,
+  handleGetMissionState,
+  handleSubmitMissionHandoff,
+  handleListMissionEvents,
+  handleSubmitValidatorResult,
+  handleRunMissionLoop,
 } from "./handlers.js";
 import fs from "fs";
 
@@ -17,6 +24,9 @@ vi.mock("fs", async (importOriginal) => {
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
     statSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    readdirSync: vi.fn(),
+    mkdirSync: vi.fn(),
   };
   return {
     ...actual,
@@ -328,7 +338,7 @@ describe("@agent-context-kit/toolshed-server/handlers", () => {
 
     it("reports mixed results correctly when some checks pass and some fail", async () => {
       vi.mocked(fs.existsSync)
-        .mockReturnValueOnce(true)   // first check — file exists
+        .mockReturnValueOnce(true) // first check — file exists
         .mockReturnValueOnce(false); // second check — file missing
 
       const res = await handleVerifyAction(mockRoot, {
@@ -357,7 +367,9 @@ describe("@agent-context-kit/toolshed-server/handlers", () => {
 
     it("fails command_succeeds when command throws", async () => {
       const { execSync } = await import("child_process");
-      vi.mocked(execSync).mockImplementation(() => { throw new Error("failed"); });
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("failed");
+      });
       const res = await handleVerifyAction(mockRoot, {
         description: "Ran build",
         checks: [{ type: "command_succeeds", command: "npm run build" }],
@@ -406,6 +418,244 @@ describe("@agent-context-kit/toolshed-server/handlers", () => {
       });
       expect(res.isError).toBe(true);
       expect(res.content[0].text).toContain("❌");
+    });
+  });
+
+  describe("mission handlers", () => {
+    it("creates a mission state file", () => {
+      vi.mocked(fs.existsSync).mockImplementation((path) =>
+        String(path).endsWith(".json") ? false : true,
+      );
+      const res = handleCreateMission({}, mockRoot, {
+        goal: "Ship mission MVP",
+        mission_id: "mission-1",
+      });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Mission Created");
+      expect(fs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it("returns mission state json", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: { summary: "Plan", slices: [] },
+          validationContract: [],
+          handoffs: [],
+          events: [],
+          findings: [],
+        }),
+      );
+      const res = handleGetMissionState({}, mockRoot, { mission_id: "mission-1" });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain('"mission-1"');
+    });
+
+    it("records a mission handoff", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: { summary: "Plan", slices: [] },
+          validationContract: [],
+          handoffs: [],
+          events: [],
+          findings: [],
+        }),
+      );
+      const res = handleSubmitMissionHandoff({}, mockRoot, {
+        mission_id: "mission-1",
+        handoff: {
+          runId: "wrk-1",
+          role: "worker",
+          status: "completed",
+          summary: "Implemented state store",
+        },
+      });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Mission Handoff Recorded");
+      expect(fs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it("lists mission events", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: { summary: "Plan", slices: [] },
+          validationContract: [],
+          handoffs: [],
+          events: [{ timestamp: "now", type: "mission.created", message: "created" }],
+          findings: [],
+        }),
+      );
+      const res = handleListMissionEvents({}, mockRoot, { mission_id: "mission-1" });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("mission.created");
+    });
+
+    it("creates a mission from a GitHub issue", async () => {
+      const { execSync } = await import("child_process");
+      vi.mocked(fs.existsSync).mockImplementation((path) =>
+        String(path).endsWith(".json") ? false : true,
+      );
+      vi.mocked(execSync).mockReturnValue(
+        JSON.stringify({
+          number: 123,
+          title: "Implement planner",
+          body: "- Add slices\n- Add validation",
+          url: "https://example.test/issues/123",
+        }),
+      );
+      const res = handleCreateMissionFromIssue({}, mockRoot, {
+        issue_number: 123,
+        repo: "owner/repo",
+        mission_id: "mission-issue-123",
+      });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Mission Created");
+      expect(fs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it("records validator results and creates repair slices", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: {
+            summary: "Plan",
+            slices: [{ id: "slice-1", title: "Implement", kind: "implement", status: "planned" }],
+          },
+          validationContract: [],
+          handoffs: [],
+          events: [],
+          findings: [],
+        }),
+      );
+      const res = handleSubmitValidatorResult({}, mockRoot, {
+        mission_id: "mission-1",
+        result: {
+          runId: "val-1",
+          validator: "scrutiny",
+          status: "failed",
+          summary: "Tests failed",
+          findings: [
+            {
+              validator: "scrutiny",
+              severity: "medium",
+              summary: "A test failed",
+              relatedSliceId: "slice-1",
+            },
+          ],
+        },
+      });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Validator Result Recorded");
+      expect(fs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it("runs the autonomous mission loop to completion", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: {
+            summary: "Plan",
+            slices: [
+              { id: "slice-1-plan", title: "Plan", kind: "plan", status: "planned" },
+              {
+                id: "slice-2-implement",
+                title: "Implement",
+                kind: "implement",
+                status: "planned",
+                dependsOn: ["slice-1-plan"],
+              },
+              {
+                id: "slice-3-validate",
+                title: "Validate",
+                kind: "validate",
+                status: "planned",
+                dependsOn: ["slice-2-implement"],
+              },
+            ],
+          },
+          validationContract: [],
+          handoffs: [],
+          events: [],
+          findings: [],
+        }),
+      );
+      const res = handleRunMissionLoop({}, mockRoot, { mission_id: "mission-1" });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Mission Loop Completed");
+      expect(res.content[0].text).toContain("Reason:** completed");
+      expect(fs.writeFileSync).toHaveBeenCalled();
+    });
+
+    it("runs repair and revalidate when findings are injected", () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          id: "mission-1",
+          goal: "Goal",
+          status: "planned",
+          createdAt: "now",
+          updatedAt: "now",
+          plan: {
+            summary: "Plan",
+            slices: [
+              { id: "slice-1-plan", title: "Plan", kind: "plan", status: "planned" },
+              {
+                id: "slice-2-implement",
+                title: "Implement",
+                kind: "implement",
+                status: "planned",
+                dependsOn: ["slice-1-plan"],
+              },
+              {
+                id: "slice-3-validate",
+                title: "Validate",
+                kind: "validate",
+                status: "planned",
+                dependsOn: ["slice-2-implement"],
+              },
+            ],
+          },
+          validationContract: [],
+          handoffs: [],
+          events: [],
+          findings: [],
+        }),
+      );
+      const res = handleRunMissionLoop({}, mockRoot, {
+        mission_id: "mission-1",
+        simulate_findings: ["Fix flaky validator"],
+      });
+      expect(res.isError).toBeUndefined();
+      expect(res.content[0].text).toContain("Mission Loop Completed");
+      expect(res.content[0].text).toContain("Open findings:** 0");
+      expect(fs.writeFileSync).toHaveBeenCalled();
     });
   });
 });

@@ -1,0 +1,188 @@
+{
+  "id": "test-mission-1778410119270",
+  "goal": "Test mission",
+  "status": "completed",
+  "createdAt": "2026-05-10T10:48:39.270Z",
+  "updatedAt": "2026-05-10T10:48:39.338Z",
+  "plan": {
+    "summary": "Plan derived from goal: Test mission",
+    "slices": [
+      {
+        "id": "slice-1-plan",
+        "title": "Clarify implementation scope for Test mission",
+        "kind": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "slice-2-implement",
+        "title": "Implement core work for Test mission",
+        "kind": "implement",
+        "status": "completed",
+        "dependsOn": [
+          "slice-1-plan"
+        ]
+      },
+      {
+        "id": "slice-3-validate",
+        "title": "Validate and record results for Test mission",
+        "kind": "validate",
+        "status": "completed",
+        "dependsOn": [
+          "slice-2-implement"
+        ]
+      },
+      {
+        "id": "test-mission-1778410119270-slice-3-validate-1778410119337-finding-1-repair",
+        "title": "Repair: Fix flaky validator",
+        "kind": "repair",
+        "status": "completed",
+        "summary": "Validator found 1 issue(s)",
+        "dependsOn": [
+          "slice-2-implement"
+        ]
+      },
+      {
+        "id": "test-mission-1778410119270-slice-3-validate-1778410119337-revalidate",
+        "title": "Re-validate after repairs",
+        "kind": "validate",
+        "status": "completed",
+        "dependsOn": [
+          "test-mission-1778410119270-slice-3-validate-1778410119337-finding-1-repair"
+        ]
+      }
+    ]
+  },
+  "validationContract": [
+    {
+      "id": "vc-1",
+      "title": "mission-state-persists",
+      "type": "scrutiny",
+      "description": "The mission state must persist the plan, findings, and handoffs for this task."
+    },
+    {
+      "id": "vc-2",
+      "title": "primary-request-is-validated",
+      "type": "behavioral",
+      "description": "The primary requested outcome for \"Test mission\" must be validated independently of implementation decisions."
+    }
+  ],
+  "handoffs": [
+    {
+      "runId": "test-mission-1778410119270-worker-1",
+      "role": "worker",
+      "status": "completed",
+      "summary": "Auto-completed plan slice: Clarify implementation scope for Test mission"
+    },
+    {
+      "runId": "test-mission-1778410119270-worker-2",
+      "role": "worker",
+      "status": "completed",
+      "summary": "Auto-completed implement slice: Implement core work for Test mission"
+    },
+    {
+      "runId": "test-mission-1778410119270-slice-3-validate-1778410119337",
+      "role": "validator",
+      "status": "completed_with_findings",
+      "summary": "Validator found 1 issue(s)",
+      "issues": [
+        "Fix flaky validator"
+      ]
+    },
+    {
+      "runId": "test-mission-1778410119270-worker-4",
+      "role": "worker",
+      "status": "completed",
+      "summary": "Auto-completed repair slice: Repair: Fix flaky validator"
+    },
+    {
+      "runId": "test-mission-1778410119270-test-mission-1778410119270-slice-3-validate-1778410119337-revalidate-1778410119338",
+      "role": "validator",
+      "status": "completed",
+      "summary": "Auto-validator passed",
+      "issues": []
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-05-10T10:48:39.270Z",
+      "type": "mission.created",
+      "message": "Mission created for goal: Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.336Z",
+      "type": "mission.slice_started",
+      "message": "Starting plan slice slice-1-plan: Clarify implementation scope for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.slice_completed",
+      "message": "Completed plan slice slice-1-plan: Clarify implementation scope for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.slice_started",
+      "message": "Starting implement slice slice-2-implement: Implement core work for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.slice_completed",
+      "message": "Completed implement slice slice-2-implement: Implement core work for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.slice_started",
+      "message": "Starting validate slice slice-3-validate: Validate and record results for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.slice_completed",
+      "message": "Completed validate slice slice-3-validate: Validate and record results for Test mission"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.337Z",
+      "type": "mission.validator_failed",
+      "message": "scrutiny reported 1 finding(s) for slice-3-validate"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.slice_started",
+      "message": "Starting repair slice test-mission-1778410119270-slice-3-validate-1778410119337-finding-1-repair: Repair: Fix flaky validator"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.slice_completed",
+      "message": "Completed repair slice test-mission-1778410119270-slice-3-validate-1778410119337-finding-1-repair: Repair: Fix flaky validator"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.slice_started",
+      "message": "Starting validate slice test-mission-1778410119270-slice-3-validate-1778410119337-revalidate: Re-validate after repairs"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.slice_completed",
+      "message": "Completed validate slice test-mission-1778410119270-slice-3-validate-1778410119337-revalidate: Re-validate after repairs"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.validator_passed",
+      "message": "scrutiny passed for test-mission-1778410119270-slice-3-validate-1778410119337-revalidate: Auto-validator passed"
+    },
+    {
+      "timestamp": "2026-05-10T10:48:39.338Z",
+      "type": "mission.completed",
+      "message": "Mission completed for goal: Test mission"
+    }
+  ],
+  "findings": [
+    {
+      "id": "test-mission-1778410119270-slice-3-validate-1778410119337-finding-1",
+      "validator": "scrutiny",
+      "severity": "medium",
+      "summary": "Fix flaky validator",
+      "details": "Validator found 1 issue(s)",
+      "relatedSliceId": "slice-2-implement",
+      "status": "resolved"
+    }
+  ]
+}

@@ -29,7 +29,9 @@ describe("@agent-context-kit/langchain", () => {
       const fs = await import("fs");
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue("bad_yaml: [}");
-      expect(() => createContextKitTools("manifest.yaml")).toThrow(/Invalid manifest.yaml structure/);
+      expect(() => createContextKitTools("manifest.yaml")).toThrow(
+        /Invalid manifest.yaml structure/,
+      );
     });
 
     it("returns the full Toolshed tool set with valid manifest", async () => {
@@ -37,22 +39,29 @@ describe("@agent-context-kit/langchain", () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue("identity:\n  values: values.md");
       const tools = createContextKitTools("manifest.yaml");
-      expect(tools.length).toBe(16);
+      expect(tools.length).toBe(23);
       const names = tools.map((t) => t.name).sort();
       expect(names).toEqual([
         "add_glossary_term",
         "add_learning",
+        "create_mission",
+        "create_mission_from_issue",
         "get_guardrails",
         "get_learnings",
+        "get_mission_state",
         "get_project_identity",
         "get_prompt",
         "get_rules",
         "get_spec",
+        "list_mission_events",
         "list_prompts",
         "list_registry",
         "lookup_glossary",
         "request_human_approval",
+        "run_mission_loop",
         "search_context",
+        "submit_mission_handoff",
+        "submit_validator_result",
         "update_feature_status",
         "validate_context",
         "verify_action",

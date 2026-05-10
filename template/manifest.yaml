@@ -50,6 +50,9 @@ registry:
   - name: feature-spec-registry
     path: docs/features/feature-spec-registry.md
     status: stable
+  - name: mission-runtime
+    path: docs/features/mission-runtime/feature.md
+    status: planned
   - name: toolshed-mcp-integration
     path: docs/features/toolshed-mcp-integration.md
     status: stable
@@ -121,3 +124,55 @@ toolshed:
 #       blocked_actions:
 #         - "modify css or styling"
 #         - "change react components"
+
+# ── Mission Runtime (optional) ───────────────────────────────────────────────
+# Configuration for long-running orchestrator / worker / validator workflows.
+# The initial runtime stores mission state locally under `state_dir` and can
+# seed missions with a validation contract and structured handoff expectations.
+#
+# mission:
+#   enabled: true
+#   state_dir: .agent-context-kit/missions
+#   roles:
+#     orchestrator:
+#       provider: openai
+#       model: gpt-5.4
+#       effort: high
+#     worker:
+#       provider: anthropic
+#       model: claude-sonnet
+#       effort: medium
+#     validator:
+#       provider: openai
+#       model: gpt-5.4-mini
+#       effort: medium
+#   validation_contract:
+#     required: true
+#     assertions:
+#       - id: vc-001
+#         title: starting-a-mission-persists-state
+#         type: scrutiny
+#         description: Starting a mission creates a persistent state file.
+#   handoff:
+#     required: true
+#     schema_version: 1.0
+#     example:
+#       runId: wrk-001
+#       role: worker
+#       status: completed
+#       summary: Implemented the assigned slice.
+#       filesTouched:
+#         - packages/missions/src/state.ts
+#       commands:
+#         - command: npm test -- missions
+#           exitCode: 0
+#       issues: []
+#       nextSuggestedAction: Run scrutiny validator.
+#   execution:
+#     worker_commands:
+#       - npm run build -w @agent-context-kit/missions
+#     validator_commands:
+#       scrutiny:
+#         - npx vitest run packages/missions/src/runner.test.ts
+#       behavioral:
+#         - npm test

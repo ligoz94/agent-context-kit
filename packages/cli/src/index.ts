@@ -24,6 +24,15 @@ import {
 import { resolve, join, relative, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline";
+import yaml from "js-yaml";
+import { execSync } from "child_process";
+import {
+  createValidatorResult,
+  runMissionLoop,
+  type MissionValidatorContext,
+  type MissionWorkerContext,
+  type MissionLoopResult,
+} from "../../missions/dist/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -100,6 +109,84 @@ export function copyTemplate(src: string, dest: string, force = false) {
     fail(`Cannot write file: ${dest} — ${(e as Error).message}`);
     throw e;
   }
+}
+
+export function buildInitManifest(templateContent: string, enableMissionWorkflow: boolean): string {
+  if (enableMissionWorkflow) return templateContent;
+
+  let output = templateContent.replace(
+    /\n  - name: mission-runtime\n    path: docs\/features\/mission-runtime\/feature\.md\n    status: planned/g,
+    "",
+  );
+
+  output = output.replace(/\n# ── Mission Runtime \(optional\) ─[\s\S]*$/, "");
+
+  return output.trimEnd() + "\n";
+}
+
+export function enableMissionManifest(existingContent: string): string {
+  let output = existingContent;
+
+  if (!output.includes("name: mission-runtime")) {
+    const newEntry =
+      "\n  - name: mission-runtime\n    path: docs/features/mission-runtime/feature.md\n    status: planned";
+    if (output.includes("registry: []")) {
+      output = output.replace("registry: []", `registry:${newEntry}`);
+    } else if (output.includes("registry:")) {
+      output = output.replace("registry:", `registry:${newEntry}`);
+    } else {
+      output += `\nregistry:${newEntry}\n`;
+    }
+  }
+
+  if (!/\nmission:\n/.test(output)) {
+    output =
+      output.trimEnd() +
+      "\n\n# ── Mission Runtime (optional) ───────────────────────────────────────────────\n" +
+      "mission:\n" +
+      "  enabled: true\n" +
+      "  state_dir: .agent-context-kit/missions\n";
+  }
+
+  return output.trimEnd() + "\n";
+}
+
+export function cmdEnableMission(cwd: string = process.cwd()) {
+  const manifestPath = join(cwd, "manifest.yaml");
+  if (!existsSync(manifestPath)) {
+    fail("manifest.yaml not found. Run: context-kit init first");
+    process.exit(1);
+  }
+
+  let templateDir: string;
+  try {
+    templateDir = findTemplateDir();
+  } catch (e) {
+    fail((e as Error).message);
+    process.exit(1);
+  }
+
+  const updatedManifest = enableMissionManifest(readFileSync(manifestPath, "utf8"));
+  writeFileSync(manifestPath, updatedManifest, "utf8");
+  ok("Updated: manifest.yaml");
+
+  ensureDir(join(cwd, "docs/features/mission-runtime/specs"));
+  copyTemplate(
+    join(templateDir, "docs/features/mission-runtime/feature.md"),
+    join(cwd, "docs/features/mission-runtime/feature.md"),
+  );
+  copyTemplateDirFiles(templateDir, "docs/features/mission-runtime/specs", cwd);
+  copyTemplate(
+    join(templateDir, "docs/human/mission-workflow.md"),
+    join(cwd, "docs/human/mission-workflow.md"),
+  );
+
+  log("Mission workflow enabled.");
+  console.log("");
+  console.log("Next steps:");
+  console.log("  1. Read docs/human/mission-workflow.md");
+  console.log("  2. Adjust mission.execution commands in manifest.yaml if needed");
+  console.log('  3. Start with: context-kit mission start "Your goal"');
 }
 
 export function writeWorkspaceMcpConfig(mcpPath: string, serverName: string, serverEntry: object) {
@@ -212,9 +299,22 @@ export async function cmdInit(cwd: string = process.cwd()) {
   );
   const installTokenTools = tokenAnswer !== "n" && tokenAnswer !== "no";
 
+  const missionAnswer = await ask(
+    "\x1b[36m[context-kit]\x1b[0m Enable mission workflow scaffolding?\n" +
+      "  y) Yes — add mission runtime docs/config\n" +
+      "  n) No — keep the classic agent-context-kit workflow only\n" +
+      "  Choice [n]: ",
+  );
+  const installMissionWorkflow = missionAnswer === "y" || missionAnswer === "yes";
+
   log("Initialising agent-context-kit...");
 
-  copyTemplate(join(templateDir, "manifest.yaml"), join(cwd, "manifest.yaml"));
+  const manifestContent = buildInitManifest(
+    readFileSync(join(templateDir, "manifest.yaml"), "utf8"),
+    installMissionWorkflow,
+  );
+  writeFileSync(join(cwd, "manifest.yaml"), manifestContent);
+  ok("Created: manifest.yaml");
 
   const agentFiles = [
     "values.md",
@@ -256,6 +356,19 @@ export async function cmdInit(cwd: string = process.cwd()) {
     join(templateDir, "docs/features/specs/_template.md"),
     join(cwd, "docs/features/specs/_template.md"),
   );
+
+  if (installMissionWorkflow) {
+    ensureDir(join(cwd, "docs/features/mission-runtime/specs"));
+    copyTemplate(
+      join(templateDir, "docs/features/mission-runtime/feature.md"),
+      join(cwd, "docs/features/mission-runtime/feature.md"),
+    );
+    copyTemplateDirFiles(templateDir, "docs/features/mission-runtime/specs", cwd);
+    copyTemplate(
+      join(templateDir, "docs/human/mission-workflow.md"),
+      join(cwd, "docs/human/mission-workflow.md"),
+    );
+  }
 
   copyTemplate(
     join(templateDir, "docs/decisions/_template.md"),
@@ -595,17 +708,645 @@ export function cmdList(cwd: string = process.cwd()) {
   }
 }
 
+function readManifest(cwd: string): Record<string, any> {
+  const manifestPath = join(cwd, "manifest.yaml");
+  if (!existsSync(manifestPath)) {
+    throw new Error("manifest.yaml not found. Are you in the project root?");
+  }
+  return (yaml.load(readFileSync(manifestPath, "utf8")) as Record<string, any>) ?? {};
+}
+
+function missionStateDir(cwd: string, manifest: Record<string, any>): string {
+  return join(cwd, manifest.mission?.state_dir ?? ".agent-context-kit/missions");
+}
+
+function missionFile(cwd: string, manifest: Record<string, any>, missionId: string): string {
+  return join(missionStateDir(cwd, manifest), `${missionId}.json`);
+}
+
+function latestMissionId(cwd: string, manifest: Record<string, any>): string | null {
+  const dir = missionStateDir(cwd, manifest);
+  if (!existsSync(dir)) return null;
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith(".json"))
+    .sort((left, right) => statSync(join(dir, right)).mtimeMs - statSync(join(dir, left)).mtimeMs);
+  return files[0]?.replace(/\.json$/, "") ?? null;
+}
+
+function normalizeLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function extractTaskLines(text: string): string[] {
+  const lines = normalizeLines(text);
+  const bulletLines = lines
+    .map((line) => line.match(/^[-*]\s+(.*)$/)?.[1] ?? line.match(/^\d+\.\s+(.*)$/)?.[1])
+    .filter((line): line is string => Boolean(line));
+  if (bulletLines.length > 0) return bulletLines.slice(0, 5);
+
+  return text
+    .split(/[.!?]/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 12)
+    .slice(0, 3);
+}
+
+function createMissionPlan(goal: string, issue?: { number: number; title: string; body?: string }) {
+  const sourceText = issue ? `${issue.title}\n${issue.body ?? ""}` : goal;
+  const tasks = extractTaskLines(sourceText);
+  if (tasks.length === 0) {
+    return {
+      summary: issue
+        ? `Plan derived from GitHub issue #${issue.number}: ${issue.title}`
+        : `Plan derived from goal: ${goal}`,
+      slices: [
+        {
+          id: "slice-1-plan",
+          title: `Clarify implementation scope for ${goal}`,
+          kind: "plan",
+          status: "planned",
+        },
+        {
+          id: "slice-2-implement",
+          title: `Implement core work for ${goal}`,
+          kind: "implement",
+          status: "planned",
+          dependsOn: ["slice-1-plan"],
+        },
+        {
+          id: "slice-3-validate",
+          title: `Validate and record results for ${goal}`,
+          kind: "validate",
+          status: "planned",
+          dependsOn: ["slice-2-implement"],
+        },
+      ],
+    };
+  }
+
+  return {
+    summary: issue
+      ? `Plan derived from GitHub issue #${issue.number}: ${issue.title}`
+      : `Plan derived from goal: ${goal}`,
+    slices: tasks.map((task, index) => ({
+      id: `slice-${index + 1}`,
+      title: task,
+      kind: index === tasks.length - 1 ? "validate" : "implement",
+      status: "planned",
+      dependsOn: index > 0 ? [`slice-${index}`] : undefined,
+    })),
+  };
+}
+
+function createValidationAssertions(goal: string, issue?: { title: string; body?: string }) {
+  const sourceText = issue ? `${issue.title}\n${issue.body ?? ""}` : goal;
+  const explicitAssertions = normalizeLines(sourceText)
+    .filter((line) => /should|must|acceptance|criteria|verify|validation/i.test(line))
+    .slice(0, 4)
+    .map((line, index) => ({
+      id: `vc-${index + 1}`,
+      title: line.slice(0, 80),
+      type: /ui|page|render|click|browser/i.test(line) ? "behavioral" : "scrutiny",
+      description: line,
+    }));
+  if (explicitAssertions.length > 0) return explicitAssertions;
+  return manifestLikeDefaultAssertions(goal);
+}
+
+function manifestLikeDefaultAssertions(goal: string) {
+  return [
+    {
+      id: "vc-1",
+      title: "mission-state-persists",
+      type: "scrutiny",
+      description: "The mission state must persist the plan, findings, and handoffs for this task.",
+    },
+    {
+      id: "vc-2",
+      title: "primary-request-is-validated",
+      type: "behavioral",
+      description: `The primary requested outcome for \"${goal}\" must be validated independently of implementation decisions.`,
+    },
+  ];
+}
+
+function fetchGitHubIssue(
+  issueNumber: number,
+  repo?: string,
+): { number: number; title: string; body?: string; repo?: string; url?: string } {
+  const repoArgs = repo ? ["--repo", repo] : [];
+  const output = execSync(
+    [
+      "gh",
+      "issue",
+      "view",
+      String(issueNumber),
+      ...repoArgs,
+      "--json",
+      "number,title,body,url",
+    ].join(" "),
+    { encoding: "utf8" },
+  );
+  const parsed = JSON.parse(output) as {
+    number: number;
+    title: string;
+    body?: string;
+    url?: string;
+  };
+  return { ...parsed, repo };
+}
+
+function parseMissionStartArgs(args: string[]): {
+  issueNumber?: number;
+  repo?: string;
+  goal?: string;
+} {
+  const rest = [...args];
+  let issueNumber: number | undefined;
+  let repo: string | undefined;
+  const goalParts: string[] = [];
+
+  while (rest.length > 0) {
+    const token = rest.shift()!;
+    if (token === "--issue") {
+      const value = rest.shift();
+      issueNumber = value ? Number(value) : undefined;
+      continue;
+    }
+    if (token === "--repo") {
+      repo = rest.shift();
+      continue;
+    }
+    goalParts.push(token);
+  }
+
+  return { issueNumber, repo, goal: goalParts.join(" ").trim() || undefined };
+}
+
+function parseMissionValidateArgs(args: string[]): {
+  missionId?: string;
+  validator?: "scrutiny" | "behavioral" | "review";
+  summary?: string;
+  failedChecks: string[];
+} {
+  const rest = [...args];
+  const failedChecks: string[] = [];
+  let missionId: string | undefined;
+  let validator: "scrutiny" | "behavioral" | "review" | undefined;
+  let summary: string | undefined;
+
+  while (rest.length > 0) {
+    const token = rest.shift()!;
+    if (token === "--mission") {
+      missionId = rest.shift();
+      continue;
+    }
+    if (token === "--validator") {
+      validator = rest.shift() as "scrutiny" | "behavioral" | "review" | undefined;
+      continue;
+    }
+    if (token === "--summary") {
+      summary = rest.shift();
+      continue;
+    }
+    if (token === "--failed-check") {
+      const value = rest.shift();
+      if (value) failedChecks.push(value);
+      continue;
+    }
+  }
+
+  return { missionId, validator, summary, failedChecks };
+}
+
+function parseMissionRunArgs(args: string[]): {
+  missionId?: string;
+  maxIterations?: number;
+  validator: "scrutiny" | "behavioral" | "review";
+  simulatedFindings: string[];
+  workerCommands: string[];
+  validateCommands: string[];
+} {
+  const rest = [...args];
+  const simulatedFindings: string[] = [];
+  const workerCommands: string[] = [];
+  const validateCommands: string[] = [];
+  let missionId: string | undefined;
+  let maxIterations: number | undefined;
+  let validator: "scrutiny" | "behavioral" | "review" = "scrutiny";
+
+  while (rest.length > 0) {
+    const token = rest.shift()!;
+    if (token === "--mission") {
+      missionId = rest.shift();
+      continue;
+    }
+    if (token === "--max-iterations") {
+      const value = rest.shift();
+      maxIterations = value ? Number(value) : undefined;
+      continue;
+    }
+    if (token === "--validator") {
+      validator = (rest.shift() as "scrutiny" | "behavioral" | "review" | undefined) ?? "scrutiny";
+      continue;
+    }
+    if (token === "--simulate-finding") {
+      const value = rest.shift();
+      if (value) simulatedFindings.push(value);
+      continue;
+    }
+    if (token === "--worker-command") {
+      const value = rest.shift();
+      if (value) workerCommands.push(value);
+      continue;
+    }
+    if (token === "--validate-command") {
+      const value = rest.shift();
+      if (value) validateCommands.push(value);
+    }
+  }
+
+  return {
+    missionId,
+    maxIterations,
+    validator,
+    simulatedFindings,
+    workerCommands,
+    validateCommands,
+  };
+}
+
+function commandErrorMessage(error: unknown): string {
+  const stderr = (error as { stderr?: string | Buffer }).stderr;
+  if (typeof stderr === "string" && stderr.trim()) return stderr.trim();
+  if (stderr && typeof Buffer !== "undefined" && Buffer.isBuffer(stderr)) {
+    const text = stderr.toString("utf8").trim();
+    if (text) return text;
+  }
+
+  return (error as Error).message;
+}
+
+function runMissionCommands(
+  commands: string[],
+  cwd: string,
+): Array<{ command: string; exitCode: number; output?: string }> {
+  return commands.map((command) => {
+    try {
+      const output = execSync(command, {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
+      return { command, exitCode: 0, output };
+    } catch (error) {
+      return {
+        command,
+        exitCode: (error as { status?: number }).status ?? 1,
+        output: commandErrorMessage(error),
+      };
+    }
+  });
+}
+
+function manifestMissionExecution(
+  manifest: Record<string, any>,
+  validator: "scrutiny" | "behavioral" | "review",
+) {
+  const execution = manifest.mission?.execution as
+    | {
+        worker_commands?: string[];
+        validator_commands?: Partial<Record<"scrutiny" | "behavioral" | "review", string[]>>;
+      }
+    | undefined;
+
+  return {
+    workerCommands: execution?.worker_commands ?? [],
+    validateCommands: execution?.validator_commands?.[validator] ?? [],
+  };
+}
+
+function missionRunTimeline(events: Array<{ type: string; message: string }>): string[] {
+  return events
+    .filter((event) => event.type !== "mission.created")
+    .slice(-6)
+    .map((event) => `- ${event.message}`);
+}
+
+export function cmdMissionStart(rawArgs?: string | string[], cwd: string = process.cwd()) {
+  const parsedArgs = Array.isArray(rawArgs) ? parseMissionStartArgs(rawArgs) : { goal: rawArgs };
+  let issue:
+    | { number: number; title: string; body?: string; repo?: string; url?: string }
+    | undefined;
+  if (parsedArgs.issueNumber) {
+    issue = fetchGitHubIssue(parsedArgs.issueNumber, parsedArgs.repo);
+  }
+
+  const goal = parsedArgs.goal ?? issue?.title;
+  if (!goal) {
+    fail(
+      "Goal is required. Usage: context-kit mission start <goal> or context-kit mission start --issue <number>",
+    );
+    process.exit(1);
+  }
+
+  const manifest = readManifest(cwd);
+  const dir = missionStateDir(cwd, manifest);
+  ensureDir(dir);
+  const missionId = `${
+    goal
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "mission"
+  }-${Date.now()}`;
+  const now = new Date().toISOString();
+  const state = {
+    id: missionId,
+    goal,
+    status: "planned",
+    createdAt: now,
+    updatedAt: now,
+    sourceIssue: issue,
+    plan: createMissionPlan(goal, issue),
+    validationContract:
+      manifest.mission?.validation_contract?.assertions ?? createValidationAssertions(goal, issue),
+    handoffs: [],
+    events: [
+      { timestamp: now, type: "mission.created", message: `Mission created for goal: ${goal}` },
+    ],
+    findings: [],
+  };
+
+  writeFileSync(missionFile(cwd, manifest, missionId), JSON.stringify(state, null, 2), "utf8");
+  ok(`Created mission: ${missionId}`);
+  console.log(`State file: ${relative(cwd, missionFile(cwd, manifest, missionId))}`);
+}
+
+export function cmdMissionStatus(missionId?: string, cwd: string = process.cwd()) {
+  const manifest = readManifest(cwd);
+  const resolvedMissionId = missionId ?? latestMissionId(cwd, manifest);
+  if (!resolvedMissionId) {
+    fail("No mission state found. Start one with: context-kit mission start <goal>");
+    process.exit(1);
+  }
+
+  const filePath = missionFile(cwd, manifest, resolvedMissionId);
+  if (!existsSync(filePath)) {
+    fail(`Mission not found: ${resolvedMissionId}`);
+    process.exit(1);
+  }
+
+  const state = JSON.parse(readFileSync(filePath, "utf8")) as {
+    id: string;
+    goal: string;
+    status: string;
+    sourceIssue?: { number: number; repo?: string };
+    plan: {
+      summary: string;
+      slices: Array<{ id: string; title: string; status: string; kind: string }>;
+    };
+    handoffs: Array<{ role: string; status: string; summary: string }>;
+    events: Array<{ message: string }>;
+    findings: Array<{ summary: string; validator: string; severity: string; status: string }>;
+  };
+  const lastEvent = state.events[state.events.length - 1]?.message ?? "none";
+  const lastHandoff = state.handoffs[state.handoffs.length - 1];
+  console.log(`Mission: ${state.id}`);
+  console.log(`Goal: ${state.goal}`);
+  console.log(`Status: ${state.status}`);
+  if (state.sourceIssue)
+    console.log(
+      `Source issue: #${state.sourceIssue.number}${state.sourceIssue.repo ? ` (${state.sourceIssue.repo})` : ""}`,
+    );
+  console.log(`Plan summary: ${state.plan.summary}`);
+  console.log(`Planned slices: ${state.plan.slices.length}`);
+  console.log(
+    `Open findings: ${state.findings.filter((finding) => finding.status === "open").length}`,
+  );
+  console.log(`Last event: ${lastEvent}`);
+  if (lastHandoff) {
+    console.log(
+      `Last handoff: ${lastHandoff.role} / ${lastHandoff.status} — ${lastHandoff.summary}`,
+    );
+  }
+}
+
+export function cmdMissionValidate(rawArgs: string[], cwd: string = process.cwd()) {
+  const { missionId, validator, summary, failedChecks } = parseMissionValidateArgs(rawArgs);
+  if (!validator || !summary) {
+    fail(
+      "Usage: context-kit mission validate --validator <scrutiny|behavioral|review> --summary <text> [--mission <id>] [--failed-check <text> ...]",
+    );
+    process.exit(1);
+  }
+
+  const manifest = readManifest(cwd);
+  const resolvedMissionId = missionId ?? latestMissionId(cwd, manifest);
+  if (!resolvedMissionId) {
+    fail("No mission state found. Start one with: context-kit mission start <goal>");
+    process.exit(1);
+  }
+
+  const filePath = missionFile(cwd, manifest, resolvedMissionId);
+  if (!existsSync(filePath)) {
+    fail(`Mission not found: ${resolvedMissionId}`);
+    process.exit(1);
+  }
+
+  const state = JSON.parse(readFileSync(filePath, "utf8")) as {
+    id: string;
+    status: string;
+    plan: {
+      slices: Array<{
+        id: string;
+        title: string;
+        kind: string;
+        status: string;
+        summary?: string;
+        dependsOn?: string[];
+      }>;
+    };
+    findings: Array<{
+      id: string;
+      validator: string;
+      severity: string;
+      summary: string;
+      details?: string;
+      relatedSliceId?: string;
+      status: string;
+    }>;
+    events: Array<{ timestamp: string; type: string; message: string }>;
+    updatedAt: string;
+  };
+
+  const now = new Date().toISOString();
+  const findings = failedChecks.map((check, index) => ({
+    id: `${validator}-${Date.now()}-${index + 1}`,
+    validator,
+    severity: validator === "behavioral" ? "high" : "medium",
+    summary: check,
+    details: summary,
+    status: "open",
+  }));
+  state.findings.push(...findings);
+  state.events.push({
+    timestamp: now,
+    type: "mission.validator_result",
+    message: `${validator} validator ${failedChecks.length > 0 ? "failed" : "passed"}: ${summary}`,
+  });
+  state.updatedAt = now;
+  if (findings.length > 0) {
+    const existingIds = new Set(state.plan.slices.map((slice) => slice.id));
+    for (const finding of findings) {
+      const repairId = `${finding.id}-repair`;
+      if (existingIds.has(repairId)) continue;
+      state.plan.slices.push({
+        id: repairId,
+        title: `Repair: ${finding.summary}`,
+        kind: "repair",
+        status: "planned",
+        summary: finding.details,
+      });
+    }
+    state.status = "blocked";
+  }
+
+  writeFileSync(filePath, JSON.stringify(state, null, 2), "utf8");
+  ok(`Recorded ${validator} validator result for ${resolvedMissionId}`);
+}
+
+export async function cmdMissionRun(rawArgs: string[], cwd: string = process.cwd()) {
+  const {
+    missionId,
+    maxIterations,
+    validator,
+    simulatedFindings,
+    workerCommands: cliWorkerCommands,
+    validateCommands: cliValidateCommands,
+  } = parseMissionRunArgs(rawArgs);
+  let manifest: Record<string, any>;
+  try {
+    manifest = readManifest(cwd);
+  } catch (error) {
+    fail(
+      `${(error as Error).message} If you are inside this monorepo, use a generated project directory or run from template/ after creating a manifest.`,
+    );
+    process.exit(1);
+  }
+  const configuredStateDir = manifest.mission?.state_dir as string | undefined;
+  const resolvedMissionId = missionId ?? latestMissionId(cwd, manifest);
+
+  if (!resolvedMissionId) {
+    fail("No mission state found. Start one with: context-kit mission start <goal>");
+    process.exit(1);
+  }
+
+  const pendingFindings = [...simulatedFindings];
+  const configuredExecution = manifestMissionExecution(manifest, validator);
+  const workerCommands =
+    cliWorkerCommands.length > 0 ? cliWorkerCommands : configuredExecution.workerCommands;
+  const validateCommands =
+    cliValidateCommands.length > 0 ? cliValidateCommands : configuredExecution.validateCommands;
+  let injectedFindings = false;
+
+  const result: MissionLoopResult = await runMissionLoop(cwd, {
+    missionId: resolvedMissionId,
+    config: configuredStateDir ? { stateDir: configuredStateDir } : undefined,
+    maxIterations,
+    worker: ({ slice }: MissionWorkerContext) => {
+      if (slice.kind === "plan") {
+        return {
+          status: "completed",
+          summary: `Auto-completed ${slice.kind} slice: ${slice.title}`,
+        };
+      }
+
+      if (workerCommands.length === 0) {
+        return {
+          status: "completed",
+          summary: `Auto-completed ${slice.kind} slice: ${slice.title}`,
+        };
+      }
+
+      const commandResults = runMissionCommands(workerCommands, cwd);
+      const failures = commandResults.filter((command) => command.exitCode !== 0);
+      return {
+        status: failures.length > 0 ? "failed" : "completed",
+        summary:
+          failures.length > 0
+            ? `Worker commands failed for ${slice.title}`
+            : `Executed ${workerCommands.length} worker command(s) for ${slice.title}`,
+        commands: commandResults.map(({ command, exitCode }) => ({ command, exitCode })),
+        issues: failures.map(
+          (failure) => `${failure.command}: ${failure.output ?? `exit ${failure.exitCode}`}`,
+        ),
+      };
+    },
+    validator: ({ slice }: MissionValidatorContext) => {
+      const commandResults =
+        validateCommands.length > 0 ? runMissionCommands(validateCommands, cwd) : [];
+      const commandFailures = commandResults.filter((command) => command.exitCode !== 0);
+      const failedChecks = !injectedFindings ? pendingFindings.splice(0) : [];
+      failedChecks.push(
+        ...commandFailures.map(
+          (failure) => `${failure.command}: ${failure.output ?? `exit ${failure.exitCode}`}`,
+        ),
+      );
+      injectedFindings = true;
+      return createValidatorResult({
+        runId: `${resolvedMissionId}-${slice.id}-${Date.now()}`,
+        validator,
+        summary:
+          failedChecks.length > 0
+            ? `Validator found ${failedChecks.length} issue(s)`
+            : validateCommands.length > 0
+              ? `Validated with ${validateCommands.length} command(s)`
+              : "Auto-validator passed",
+        failedChecks,
+        relatedSliceId: slice.dependsOn?.[0],
+      });
+    },
+  });
+
+  console.log(`Mission: ${result.state.id}`);
+  console.log(`Loop reason: ${result.reason}`);
+  console.log(`Iterations: ${result.iterations}`);
+  console.log(`Status: ${result.state.status}`);
+  if (workerCommands.length > 0) console.log(`Worker commands: ${workerCommands.length}`);
+  if (validateCommands.length > 0) console.log(`Validator commands: ${validateCommands.length}`);
+  console.log(
+    `Completed slices: ${result.state.plan.slices.filter((slice: { status: string }) => slice.status === "completed").length}/${result.state.plan.slices.length}`,
+  );
+  console.log(
+    `Open findings: ${result.state.findings.filter((finding: { status: string }) => finding.status === "open").length}`,
+  );
+  const timeline = missionRunTimeline(result.state.events);
+  if (timeline.length > 0) {
+    console.log("Timeline:");
+    timeline.forEach((line) => console.log(line));
+  }
+}
+
 export function cmdHelp() {
   console.log(`
   context-kit <command>
 
   Commands:
     init              Scaffold docs/agent/ structure in this project
+    enable-mission    Add the optional mission workflow to an existing classic project
     setup             Auto-scan project and fill all template sections (no prompts)
     sync              Update engine regions in existing files
     check             Validate required files, L0 token hints, CLAUDE.md size hints
     list              List available prompts and features
     new-spec <name>   Scaffold a new feature spec and add it to the manifest registry
+    mission start     Create a local mission state file from a goal or --issue <number>
+    mission status    Show the latest mission summary or a specific mission id
+    mission run       Execute the autonomous planner -> worker -> validator loop locally
+    mission validate  Record a validator result and create repair slices for failures
 
   Options:
     --help  Show this help
@@ -1778,6 +2519,25 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolveArgv1(process.a
     case "new-spec":
       cmdNewSpec(process.argv[3]);
       break;
+    case "enable-mission":
+      cmdEnableMission();
+      break;
+    case "mission": {
+      const subcommand = process.argv[3];
+      if (subcommand === "start") {
+        cmdMissionStart(process.argv.slice(4));
+      } else if (subcommand === "status") {
+        cmdMissionStatus(process.argv[4]);
+      } else if (subcommand === "run") {
+        await cmdMissionRun(process.argv.slice(4));
+      } else if (subcommand === "validate") {
+        cmdMissionValidate(process.argv.slice(4));
+      } else {
+        cmdHelp();
+        process.exit(1);
+      }
+      break;
+    }
     default:
       cmdHelp();
       break;

@@ -41,6 +41,13 @@ import {
   handleGetTemplate,
   handleListTemplates,
   handleAnalyzeSpecCompleteness,
+  handleCreateMission,
+  handleCreateMissionFromIssue,
+  handleGetMissionState,
+  handleSubmitMissionHandoff,
+  handleListMissionEvents,
+  handleSubmitValidatorResult,
+  handleRunMissionLoop,
   toolName,
 } from "./handlers.js";
 
@@ -49,9 +56,7 @@ import {
 const args = process.argv.slice(2);
 const manifestFlag = args.indexOf("--manifest");
 const manifestPath =
-  manifestFlag >= 0
-    ? resolve(args[manifestFlag + 1]!)
-    : resolve(process.cwd(), "manifest.yaml");
+  manifestFlag >= 0 ? resolve(args[manifestFlag + 1]!) : resolve(process.cwd(), "manifest.yaml");
 
 const profileFlag = args.indexOf("--profile");
 const cliProfile = profileFlag >= 0 ? args[profileFlag + 1] : undefined;
@@ -80,7 +85,7 @@ if (!parsed.success) {
 }
 
 function isObj(obj: any): boolean {
-  return obj && typeof obj === 'object' && !Array.isArray(obj);
+  return obj && typeof obj === "object" && !Array.isArray(obj);
 }
 
 function deepMerge(target: any, source: any): any {
@@ -104,7 +109,9 @@ if (cliProfile) {
     manifest = deepMerge(manifest, profiles[cliProfile]);
     console.error(`[toolshed] Bound to profile: ${cliProfile}`);
   } else {
-    console.error(`[toolshed] Warning: Profile '${cliProfile}' requested but not found in manifest.yaml.`);
+    console.error(
+      `[toolshed] Warning: Profile '${cliProfile}' requested but not found in manifest.yaml.`,
+    );
   }
 }
 
@@ -159,10 +166,10 @@ mcp.registerTool(
   {
     description: "Appends a new learning to the project's key-learnings.md file.",
     inputSchema: z.object({
-      learning: z.string().describe("The learning text to add (without bullet points)")
-    })
+      learning: z.string().describe("The learning text to add (without bullet points)"),
+    }),
   },
-  async (input) => handleAddLearning(manifest, root, input)
+  async (input) => handleAddLearning(manifest, root, input),
 );
 
 mcp.registerTool(
@@ -193,10 +200,10 @@ mcp.registerTool(
     description: "Updates the status of a feature in the project's manifest.yaml registry.",
     inputSchema: z.object({
       name: z.string().describe("The name of the feature exactly as written in the registry"),
-      status: z.string().describe("The new status (e.g., in-progress, done, planned)")
-    })
+      status: z.string().describe("The new status (e.g., in-progress, done, planned)"),
+    }),
   },
-  async (input) => handleUpdateFeatureStatus(manifestPath, input)
+  async (input) => handleUpdateFeatureStatus(manifestPath, input),
 );
 
 mcp.registerTool(
@@ -216,19 +223,23 @@ mcp.registerTool(
     description: "Appends a new term and definition to the project's glossary.md file.",
     inputSchema: z.object({
       term: z.string().describe("The term to define"),
-      definition: z.string().describe("The definition of the term")
-    })
+      definition: z.string().describe("The definition of the term"),
+    }),
   },
-  async (input) => handleAddGlossaryTerm(manifest, root, input)
+  async (input) => handleAddGlossaryTerm(manifest, root, input),
 );
 
 mcp.registerTool(
   toolName(manifest, "get_prompt"),
   {
-    description: "Returns a named prompt template from docs/agent/prompts/. Supports variable substitution.",
+    description:
+      "Returns a named prompt template from docs/agent/prompts/. Supports variable substitution.",
     inputSchema: z.object({
       name: z.string().optional().describe("Prompt filename without .md extension"),
-      variables: z.record(z.string(), z.string()).optional().describe("Variables to substitute {{key}} in the prompt template")
+      variables: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe("Variables to substitute {{key}} in the prompt template"),
     }),
   },
   async (input) => handleGetPrompt(manifest, root, input),
@@ -248,25 +259,26 @@ mcp.registerTool(
   {
     description: "Searches the entire project context (rules, docs, registry) for a query string.",
     inputSchema: z.object({
-      query: z.string().describe("The text or regex query to search for")
-    })
+      query: z.string().describe("The text or regex query to search for"),
+    }),
   },
-  async (input) => handleSearchContext(manifest, root, input)
+  async (input) => handleSearchContext(manifest, root, input),
 );
 
 mcp.registerTool(
   toolName(manifest, "validate_context"),
   {
     description: "Validates that all files paths described in the manifest exist.",
-    inputSchema: emptyArgs
+    inputSchema: emptyArgs,
   },
-  async () => handleValidateContext(manifest, root)
+  async () => handleValidateContext(manifest, root),
 );
 
 mcp.registerTool(
   toolName(manifest, "get_template"),
   {
-    description: "Returns a named template (e.g. pr-body, commit-message) from the templates directory.",
+    description:
+      "Returns a named template (e.g. pr-body, commit-message) from the templates directory.",
     inputSchema: z.object({
       name: z.string().optional().describe("Template filename without .md extension"),
     }),
@@ -286,9 +298,10 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "validate_agent_report"),
   {
-    description: "Validates if a Pull Request description text adheres to the strict PNA Agent Report and Identification standard. You should pass the entire PR description string to this tool.",
+    description:
+      "Validates if a Pull Request description text adheres to the strict PNA Agent Report and Identification standard. You should pass the entire PR description string to this tool.",
     inputSchema: z.object({
-      pr_body: z.string().describe("The full Markdown content of the PR description.")
+      pr_body: z.string().describe("The full Markdown content of the PR description."),
     }),
   },
   async (input) => handleValidateAgentReport(input),
@@ -297,12 +310,165 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "analyze_spec_completeness"),
   {
-    description: "Analyzes a local markdown file containing a specification to ensure it possesses all 8 necessary Intent Engineering categories before starting an implementation.",
+    description:
+      "Analyzes a local markdown file containing a specification to ensure it possesses all 8 necessary Intent Engineering categories before starting an implementation.",
     inputSchema: z.object({
-      path: z.string().describe("The relative path to the Markdown file.")
+      path: z.string().describe("The relative path to the Markdown file."),
     }),
   },
   async (input) => handleAnalyzeSpecCompleteness(root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "create_mission"),
+  {
+    description:
+      "Creates a new mission state file from a goal and optional validation contract assertions.",
+    inputSchema: z.object({
+      goal: z.string().describe("The mission goal to track."),
+      mission_id: z.string().optional().describe("Optional stable mission identifier."),
+      validation_contract: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string(),
+            type: z.enum(["scrutiny", "behavioral", "manual"]),
+            description: z.string().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  },
+  async (input) => handleCreateMission(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "create_mission_from_issue"),
+  {
+    description: "Fetches a GitHub issue via gh CLI and creates a mission from its title and body.",
+    inputSchema: z.object({
+      issue_number: z.number().describe("GitHub issue number to convert into a mission."),
+      repo: z.string().optional().describe("Optional owner/repo override for gh issue view."),
+      mission_id: z.string().optional().describe("Optional stable mission identifier."),
+      goal_override: z
+        .string()
+        .optional()
+        .describe("Optional goal override instead of using the issue title."),
+    }),
+  },
+  async (input) => handleCreateMissionFromIssue(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "get_mission_state"),
+  {
+    description:
+      "Returns the JSON mission state for a mission id or the latest mission if omitted.",
+    inputSchema: z.object({
+      mission_id: z
+        .string()
+        .optional()
+        .describe("Mission identifier. Omit to fetch the latest mission."),
+    }),
+  },
+  async (input) => handleGetMissionState(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "submit_mission_handoff"),
+  {
+    description: "Appends a structured worker or validator handoff to a mission state file.",
+    inputSchema: z.object({
+      mission_id: z
+        .string()
+        .optional()
+        .describe("Mission identifier. Omit to target the latest mission."),
+      handoff: z.object({
+        runId: z.string(),
+        role: z.enum(["orchestrator", "worker", "validator"]),
+        status: z.enum(["completed", "completed_with_findings", "failed"]),
+        summary: z.string(),
+        filesTouched: z.array(z.string()).optional(),
+        commands: z.array(z.object({ command: z.string(), exitCode: z.number() })).optional(),
+        issues: z.array(z.string()).optional(),
+        nextSuggestedAction: z.string().optional(),
+      }),
+    }),
+  },
+  async (input) => handleSubmitMissionHandoff(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "list_mission_events"),
+  {
+    description: "Lists mission events for a mission id or the latest mission if omitted.",
+    inputSchema: z.object({
+      mission_id: z
+        .string()
+        .optional()
+        .describe("Mission identifier. Omit to fetch the latest mission."),
+    }),
+  },
+  async (input) => handleListMissionEvents(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "submit_validator_result"),
+  {
+    description:
+      "Records a validator result, stores findings, and creates repair slices for failed findings.",
+    inputSchema: z.object({
+      mission_id: z
+        .string()
+        .optional()
+        .describe("Mission identifier. Omit to target the latest mission."),
+      result: z.object({
+        runId: z.string(),
+        validator: z.enum(["scrutiny", "behavioral", "review"]),
+        status: z.enum(["passed", "failed"]),
+        summary: z.string(),
+        findings: z
+          .array(
+            z.object({
+              id: z.string().optional(),
+              validator: z.enum(["scrutiny", "behavioral", "review"]),
+              severity: z.enum(["low", "medium", "high"]),
+              summary: z.string(),
+              details: z.string().optional(),
+              relatedSliceId: z.string().optional(),
+            }),
+          )
+          .default([]),
+      }),
+    }),
+  },
+  async (input) => handleSubmitValidatorResult(manifest, root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "run_mission_loop"),
+  {
+    description:
+      "Runs the local autonomous planner -> worker -> validator mission loop for a mission state file.",
+    inputSchema: z.object({
+      mission_id: z
+        .string()
+        .optional()
+        .describe("Mission identifier. Omit to target the latest mission."),
+      max_iterations: z.number().optional().describe("Maximum loop iterations before stopping."),
+      validator: z
+        .enum(["scrutiny", "behavioral", "review"])
+        .optional()
+        .describe("Validator type used by the local loop."),
+      simulate_findings: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Optional findings to inject on the first validation pass to exercise repair flows.",
+        ),
+    }),
+  },
+  async (input) => handleRunMissionLoop(manifest, root, input),
 );
 
 mcp.registerTool(
@@ -343,19 +509,50 @@ mcp.registerTool(
       "Use after any file write, code generation, or critical state change.",
     inputSchema: z.object({
       description: z.string().describe("Human-readable description of what was just performed."),
-      checks: z.array(
-        z.object({
-          type: z
-            .enum(["file_exists", "file_contains", "file_modified_after", "command_succeeds", "http_status", "json_contains"])
-            .describe("Type of check to perform."),
-          path: z.string().optional().describe("For file-based: relative path to the file to check. For http_status: the URL."),
-          command: z.string().optional().describe("For command_succeeds: the bash command to run."),
-          expected_status: z.number().optional().describe("For http_status: the expected HTTP status code (e.g. 200)."),
-          json_path: z.string().optional().describe("For json_contains: the dot-notation path to the key in the JSON file."),
-          value: z.string().optional().describe("For file_contains or json_contains: the expected string value."),
-          after: z.string().optional().describe("For file_modified_after: ISO 8601 timestamp to compare modification time against."),
-        })
-      ).describe("One or more checks to verify the action succeeded."),
+      checks: z
+        .array(
+          z.object({
+            type: z
+              .enum([
+                "file_exists",
+                "file_contains",
+                "file_modified_after",
+                "command_succeeds",
+                "http_status",
+                "json_contains",
+              ])
+              .describe("Type of check to perform."),
+            path: z
+              .string()
+              .optional()
+              .describe(
+                "For file-based: relative path to the file to check. For http_status: the URL.",
+              ),
+            command: z
+              .string()
+              .optional()
+              .describe("For command_succeeds: the bash command to run."),
+            expected_status: z
+              .number()
+              .optional()
+              .describe("For http_status: the expected HTTP status code (e.g. 200)."),
+            json_path: z
+              .string()
+              .optional()
+              .describe("For json_contains: the dot-notation path to the key in the JSON file."),
+            value: z
+              .string()
+              .optional()
+              .describe("For file_contains or json_contains: the expected string value."),
+            after: z
+              .string()
+              .optional()
+              .describe(
+                "For file_modified_after: ISO 8601 timestamp to compare modification time against.",
+              ),
+          }),
+        )
+        .describe("One or more checks to verify the action succeeded."),
     }),
   },
   async (input) => handleVerifyAction(root, input as any),

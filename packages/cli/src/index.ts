@@ -32,7 +32,7 @@ import {
   type MissionValidatorContext,
   type MissionWorkerContext,
   type MissionLoopResult,
-} from "../../missions/dist/index.js";
+} from "@agent-context-kit/missions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

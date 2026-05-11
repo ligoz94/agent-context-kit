@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../missions/dist/index.js", () => ({
+vi.mock("@agent-context-kit/missions", () => ({
   createValidatorResult: vi.fn((input) => ({
     runId: input.runId,
     validator: input.validator,
@@ -34,7 +34,7 @@ import {
 } from "./index.js";
 import fs from "fs";
 import path from "path";
-import { runMissionLoop } from "../../missions/dist/index.js";
+import { runMissionLoop } from "@agent-context-kit/missions";
 import { execSync } from "child_process";
 
 vi.mock("child_process", () => ({
@@ -358,7 +358,7 @@ NEW STUFF
         "mission:\n  state_dir: .agent-context-kit/missions\n  execution:\n    worker_commands:\n      - npm run build\n    validator_commands:\n      scrutiny:\n        - npm test\n",
       );
       vi.mocked(execSync).mockImplementation((command: string) => `ok:${command}` as any);
-      vi.mocked(runMissionLoop).mockImplementation(async (_root, options: any) => {
+      vi.mocked(runMissionLoop).mockImplementation(async (_root: string, options: any) => {
         await options.worker({ slice: { kind: "implement", title: "Implement", id: "slice-1" } });
         options.validator({ slice: { id: "slice-2", dependsOn: ["slice-1"] } });
         return {

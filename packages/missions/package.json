@@ -5,6 +5,12 @@
   "description": "Mission runtime scaffolding for agent-context-kit",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "bin": {
     "context-kit-mission": "dist/cli.js"
   },

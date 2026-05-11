@@ -13,10 +13,11 @@
     "template"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build -w @agent-context-kit/missions && tsc",
     "prepublishOnly": "npm run build && node scripts/stage-template.mjs"
   },
   "dependencies": {
+    "@agent-context-kit/missions": "^0.1.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {

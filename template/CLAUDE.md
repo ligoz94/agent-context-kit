@@ -11,6 +11,7 @@ If the **Toolshed** server is configured for this project (`manifest.yaml` at th
 | When | Tool |
 |------|------|
 | Session start / orientation | `get_project_identity`, **`get_guardrails`**, **`get_session_bootstrap`** |
+| After packages update | `get_prompt("review-sync")` — check new features and decide what to enable |
 | Before coding or review | `get_rules` (optionally `standard`: e.g. `testing`) |
 | Feature work | `list_registry` → `get_spec` with `name` — lazy L2, not all specs |
 | Spec / plan review | `review_spec`, `review_plan` |

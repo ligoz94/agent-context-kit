@@ -1,6 +1,6 @@
 {
   "name": "@agent-context-kit/langchain",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "LangChain tools and observability integrations for agent-context-kit",
   "main": "dist/index.js",

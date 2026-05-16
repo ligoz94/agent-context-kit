@@ -555,6 +555,19 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
+  // ── Sync prompt files — create missing ones ──────────────────────────────
+  const promptsDir = join(templateDir, "docs/agent/prompts");
+  if (existsSync(promptsDir)) {
+    for (const name of readdirSync(promptsDir)) {
+      if (name === ".gitkeep" || !statSync(join(promptsDir, name)).isFile()) continue;
+      const dest = join(cwd, "docs/agent/prompts", name);
+      if (existsSync(dest)) continue;
+      copyTemplate(join(promptsDir, name), dest);
+      ok(`Created: docs/agent/prompts/${name}`);
+      created++;
+    }
+  }
+
   // ── Sync manifest.yaml — add missing sections ───────────────────────────
   const manifestDest = join(cwd, "manifest.yaml");
   const manifestSrc = join(templateDir, "manifest.yaml");

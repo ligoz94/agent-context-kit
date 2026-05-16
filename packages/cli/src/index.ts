@@ -102,6 +102,7 @@ export function copyTemplate(src: string, dest: string, force = false) {
     warn(`Skipped (exists): ${relative(process.cwd(), dest)}`);
     return;
   }
+  ensureDir(dirname(dest));
   try {
     writeFileSync(dest, readFileSync(src, "utf8"));
     ok(`Created: ${relative(process.cwd(), dest)}`);

@@ -555,9 +555,44 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
+  // ── Sync manifest.yaml — add missing sections ───────────────────────────
+  const manifestDest = join(cwd, "manifest.yaml");
+  const manifestSrc = join(templateDir, "manifest.yaml");
+  let manifestUpdated = false;
+  if (existsSync(manifestDest) && existsSync(manifestSrc)) {
+    let existing = readFileSync(manifestDest, "utf8");
+    const tmpl = readFileSync(manifestSrc, "utf8");
+
+    // Extract commented-out template sections between their headers and next header
+    const sections: { header: string; content: string }[] = [];
+    const sectionRegex = /(^# ── .+ ──+\n)([\s\S]*?)(?=^# ── |\z)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = sectionRegex.exec(tmpl)) !== null) {
+      const header = m[1].trim();
+      const content = m[2];
+      // Only add sections that are commented out (all lines start with #)
+      if (content.trim().split("\n").every((l) => l.trim() === "" || l.trim().startsWith("#"))) {
+        sections.push({ header, content });
+      }
+    }
+
+    for (const section of sections) {
+      const headerPattern = section.header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(headerPattern, "m").test(existing)) continue;
+      existing = `${existing.trimEnd()}\n\n${section.header}\n${section.content.trimEnd()}\n`;
+      manifestUpdated = true;
+    }
+
+    if (manifestUpdated) {
+      writeFileSync(manifestDest, existing);
+      ok("Updated: manifest.yaml (added new sections)");
+    }
+  }
+
   const parts: string[] = [];
   if (created > 0) parts.push(`${created} file(s) created`);
   if (synced > 0) parts.push(`${synced} file(s) updated (project regions preserved)`);
+  if (manifestUpdated) parts.push("manifest.yaml updated");
 
   if (parts.length === 0) {
     log("All engine regions are up to date.");

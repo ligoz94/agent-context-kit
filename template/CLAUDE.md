@@ -2,6 +2,14 @@
 
 Instructions for Claude (Claude Code, Desktop, or any agent with access to this repo and optional MCP).
 
+**MANDATORY FIRST ACTION — DO NOT SKIP:**
+Call `get_session_bootstrap()` immediately.
+This loads project identity, context policy, architecture, glossary, and active gates.
+Do nothing else — no code, no answers, no questions — until you've called it.
+
+If `get_session_bootstrap` is not available (no Toolshed MCP), manually read in order:
+`docs/README.md` → `docs/agent/values.md` → `docs/agent/context-policy.md` → `docs/agent/app-config.md`.
+
 Keep this file **small and imperative**: session routing and non-negotiables only. Push long conventions into **`docs/human/`** (and path-scoped **`.cursor/rules`** if you use them), and project facts into **Toolshed** / `docs/agent/`. Teams often aim for a **few hundred tokens** of always-on root text so the rest of the window stays available for code and tool output. In **Cursor**, also follow **`.cursor/rules/agent-context-kit.mdc`** and **`docs/human/agent-context-power-user-stack.md`** (*Cursor alignment*).
 
 ## Toolshed MCP (when enabled)

@@ -30,5 +30,9 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@agent-context-kit/cli": "^0.3.29",
+    "@agent-context-kit/toolshed-server": "^0.1.38"
+  }
 }

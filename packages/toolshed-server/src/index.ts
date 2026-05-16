@@ -48,6 +48,15 @@ import {
   handleListMissionEvents,
   handleSubmitValidatorResult,
   handleRunMissionLoop,
+  handleCheckGate,
+  handleAdvanceGate,
+  handleGetSessionBootstrap,
+  handleDispatchSubagent,
+  handleReviewSpec,
+  handleReviewPlan,
+  handleStartDebugging,
+  handleFinishWork,
+  handleTestRule,
   toolName,
 } from "./handlers.js";
 
@@ -127,8 +136,7 @@ mcp.registerTool(
   toolName(manifest, "get_project_identity"),
   {
     description:
-      "Returns L0 context: project values, architecture primer, and glossary. " +
-      "Call this at the start of any session to orient yourself.",
+      "Use at the start of any session to orient yourself with project identity.",
     inputSchema: emptyArgs,
   },
   async () => handleGetProjectIdentity(manifest, root),
@@ -138,8 +146,7 @@ mcp.registerTool(
   toolName(manifest, "get_rules"),
   {
     description:
-      "Returns L1 context: context policy and coding standards. " +
-      "Call this before any coding or review task.",
+      "Use before any coding or review task to load context policy and standards.",
     inputSchema: z.object({
       standard: z
         .string()
@@ -154,8 +161,7 @@ mcp.registerTool(
   toolName(manifest, "get_learnings"),
   {
     description:
-      "Returns L2 key-learnings: past bugs, wrong turns, hard-won insights. " +
-      "Always check this before suggesting a pattern or architectural decision.",
+      "Use before suggesting a pattern or architectural decision. Loads past learnings.",
     inputSchema: emptyArgs,
   },
   async () => handleGetLearnings(manifest, root),
@@ -164,7 +170,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "add_learning"),
   {
-    description: "Appends a new learning to the project's key-learnings.md file.",
+    description: "Use when you discover a lesson worth remembering. Appends to key-learnings.md.",
     inputSchema: z.object({
       learning: z.string().describe("The learning text to add (without bullet points)"),
     }),
@@ -176,8 +182,7 @@ mcp.registerTool(
   toolName(manifest, "get_spec"),
   {
     description:
-      "Returns the spec for a named feature from the registry. " +
-      "Use list_registry first to see available names.",
+      "Use when you need the full spec for a feature. Run list_registry first for available names.",
     inputSchema: z.object({
       name: z.string().optional().describe("Feature name as listed in the registry"),
     }),
@@ -188,7 +193,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "list_registry"),
   {
-    description: "Lists all features in the registry with their name and status.",
+    description: "Use to browse all registered features before starting work.",
     inputSchema: emptyArgs,
   },
   async () => handleListRegistry(manifest),
@@ -197,7 +202,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "update_feature_status"),
   {
-    description: "Updates the status of a feature in the project's manifest.yaml registry.",
+    description: "Use when a feature's status changes (in-progress, done, planned). Updates manifest.yaml.",
     inputSchema: z.object({
       name: z.string().describe("The name of the feature exactly as written in the registry"),
       status: z.string().describe("The new status (e.g., in-progress, done, planned)"),
@@ -209,7 +214,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "lookup_glossary"),
   {
-    description: "Looks up the canonical definition of a term from the project glossary.",
+    description: "Use when you encounter an unfamiliar project term. Looks up canonical definition.",
     inputSchema: z.object({
       term: z.string().optional().describe("The term to look up"),
     }),
@@ -220,7 +225,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "add_glossary_term"),
   {
-    description: "Appends a new term and definition to the project's glossary.md file.",
+    description: "Use when a new project-specific term needs a canonical definition.",
     inputSchema: z.object({
       term: z.string().describe("The term to define"),
       definition: z.string().describe("The definition of the term"),
@@ -233,7 +238,7 @@ mcp.registerTool(
   toolName(manifest, "get_prompt"),
   {
     description:
-      "Returns a named prompt template from docs/agent/prompts/. Supports variable substitution.",
+      "Use when you need a structured prompt (triage, implement, review). Supports {{variable}} substitution.",
     inputSchema: z.object({
       name: z.string().optional().describe("Prompt filename without .md extension"),
       variables: z
@@ -248,7 +253,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "list_prompts"),
   {
-    description: "Lists all available prompt templates.",
+    description: "Use to see what prompt templates are available before calling get_prompt.",
     inputSchema: emptyArgs,
   },
   async () => handleListPrompts(manifest, root),
@@ -257,7 +262,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "search_context"),
   {
-    description: "Searches the entire project context (rules, docs, registry) for a query string.",
+    description: "Use to find relevant documentation across the entire project by keyword.",
     inputSchema: z.object({
       query: z.string().describe("The text or regex query to search for"),
     }),
@@ -268,7 +273,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "validate_context"),
   {
-    description: "Validates that all files paths described in the manifest exist.",
+    description: "Use after setup or sync to verify all documented paths exist.",
     inputSchema: emptyArgs,
   },
   async () => handleValidateContext(manifest, root),
@@ -278,7 +283,7 @@ mcp.registerTool(
   toolName(manifest, "get_template"),
   {
     description:
-      "Returns a named template (e.g. pr-body, commit-message) from the templates directory.",
+      "Use when you need a starting template for PR body, commit message, or spec.",
     inputSchema: z.object({
       name: z.string().optional().describe("Template filename without .md extension"),
     }),
@@ -289,7 +294,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "list_templates"),
   {
-    description: "Lists all available templates.",
+    description: "Use to see what templates are available before calling get_template.",
     inputSchema: emptyArgs,
   },
   async () => handleListTemplates(manifest, root),
@@ -299,7 +304,7 @@ mcp.registerTool(
   toolName(manifest, "validate_agent_report"),
   {
     description:
-      "Validates if a Pull Request description text adheres to the strict PNA Agent Report and Identification standard. You should pass the entire PR description string to this tool.",
+      "Use before creating a PR to validate the description format against PNA standard.",
     inputSchema: z.object({
       pr_body: z.string().describe("The full Markdown content of the PR description."),
     }),
@@ -311,7 +316,7 @@ mcp.registerTool(
   toolName(manifest, "analyze_spec_completeness"),
   {
     description:
-      "Analyzes a local markdown file containing a specification to ensure it possesses all 8 necessary Intent Engineering categories before starting an implementation.",
+      "Use after writing a spec to check for required Intent Engineering categories before implementation.",
     inputSchema: z.object({
       path: z.string().describe("The relative path to the Markdown file."),
     }),
@@ -323,7 +328,7 @@ mcp.registerTool(
   toolName(manifest, "create_mission"),
   {
     description:
-      "Creates a new mission state file from a goal and optional validation contract assertions.",
+      "Use to start tracking structured work. Creates a mission state file from a goal.",
     inputSchema: z.object({
       goal: z.string().describe("The mission goal to track."),
       mission_id: z.string().optional().describe("Optional stable mission identifier."),
@@ -345,7 +350,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "create_mission_from_issue"),
   {
-    description: "Fetches a GitHub issue via gh CLI and creates a mission from its title and body.",
+    description: "Use to convert a GitHub issue into a structured mission. Requires gh CLI.",
     inputSchema: z.object({
       issue_number: z.number().describe("GitHub issue number to convert into a mission."),
       repo: z.string().optional().describe("Optional owner/repo override for gh issue view."),
@@ -363,7 +368,7 @@ mcp.registerTool(
   toolName(manifest, "get_mission_state"),
   {
     description:
-      "Returns the JSON mission state for a mission id or the latest mission if omitted.",
+      "Use to inspect mission progress and findings. Omit mission_id for latest mission.",
     inputSchema: z.object({
       mission_id: z
         .string()
@@ -377,7 +382,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "submit_mission_handoff"),
   {
-    description: "Appends a structured worker or validator handoff to a mission state file.",
+    description: "Use after completing a mission slice to record the handoff and outcome.",
     inputSchema: z.object({
       mission_id: z
         .string()
@@ -401,7 +406,7 @@ mcp.registerTool(
 mcp.registerTool(
   toolName(manifest, "list_mission_events"),
   {
-    description: "Lists mission events for a mission id or the latest mission if omitted.",
+    description: "Use to review the timeline of a mission. Omit mission_id for latest mission.",
     inputSchema: z.object({
       mission_id: z
         .string()
@@ -416,7 +421,7 @@ mcp.registerTool(
   toolName(manifest, "submit_validator_result"),
   {
     description:
-      "Records a validator result, stores findings, and creates repair slices for failed findings.",
+      "Use after validation to record findings. Failed findings auto-create repair slices.",
     inputSchema: z.object({
       mission_id: z
         .string()
@@ -449,7 +454,7 @@ mcp.registerTool(
   toolName(manifest, "run_mission_loop"),
   {
     description:
-      "Runs the local autonomous planner -> worker -> validator mission loop for a mission state file.",
+      "Use to execute a mission autonomously. Runs planner -> worker -> validator loop until completion.",
     inputSchema: z.object({
       mission_id: z
         .string()
@@ -471,12 +476,138 @@ mcp.registerTool(
   async (input) => handleRunMissionLoop(manifest, root, input),
 );
 
+// ── Gates ──────────────────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "check_gate"),
+  {
+    description:
+      "Use before proceeding past a gated phase (design, plan, review, merge). Checks if the required gate has been passed with evidence.",
+    inputSchema: z.object({
+      gate_name: z.string().describe("Gate name: design-approved, plan-reviewed, code-reviewed, tests-passed, tests-before-code"),
+    }),
+  },
+  async (input) => handleCheckGate(manifest, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "advance_gate"),
+  {
+    description:
+      "Use AFTER completing a gated phase to record that you passed it. Requires evidence (file path, terminal output, or description).",
+    inputSchema: z.object({
+      gate_name: z.string().describe("Gate name to advance"),
+      evidence: z.string().describe("Path, terminal output, or description proving compliance"),
+    }),
+  },
+  async (input) => handleAdvanceGate(input as any),
+);
+
+// ── Session Bootstrap ─────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "get_session_bootstrap"),
+  {
+    description:
+      "Use at the VERY START of any session. Returns layered context (L0 identity, L1 policy, active gates) so you don't start blank.",
+    inputSchema: emptyArgs,
+  },
+  async () => handleGetSessionBootstrap(manifest, root),
+);
+
+// ── Sub-agent Dispatch ────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "dispatch_subagent"),
+  {
+    description:
+      "Use to delegate a focused task to a fresh sub-agent with isolated context. Never inherit current session history. Returns structured status.",
+    inputSchema: z.object({
+      task_description: z.string().describe("The precise task for the sub-agent, including file paths and expected outcome"),
+      context_files: z.array(z.string()).optional().describe("Relative paths to files the sub-agent needs as reference"),
+      model: z.enum(["fast", "standard", "capable"]).optional().describe("Model capability hint: fast for mechanical, capable for architecture/review"),
+    }),
+  },
+  async (input) => handleDispatchSubagent(manifest, input as any),
+);
+
+// ── Reviews ───────────────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "review_spec"),
+  {
+    description:
+      "Use AFTER writing a design spec, BEFORE creating an implementation plan. Checks completeness, consistency, scope, and YAGNI. Dispatched as fresh review.",
+    inputSchema: z.object({
+      spec_path: z.string().describe("Relative path to the spec markdown file"),
+    }),
+  },
+  async (input) => handleReviewSpec(root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "review_plan"),
+  {
+    description:
+      "Use AFTER writing an implementation plan, BEFORE executing. Validates plan covers all spec requirements, tasks are granular (2-5 min), and file paths are explicit.",
+    inputSchema: z.object({
+      plan_path: z.string().describe("Relative path to the plan markdown file"),
+      spec_path: z.string().describe("Relative path to the spec the plan was derived from"),
+    }),
+  },
+  async (input) => handleReviewPlan(root, input as any),
+);
+
+// ── Debugging ─────────────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "start_debugging"),
+  {
+    description:
+      "Use when investigating a bug. Guides through 4-phase forensic process: Observe, Hypothesize, Isolate, Fix & Fortify. Not for simple issues.",
+    inputSchema: z.object({
+      description: z.string().describe("What bug or unexpected behavior are you investigating?"),
+    }),
+  },
+  async (input) => handleStartDebugging(input),
+);
+
+// ── Release Engineering ───────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "finish_work"),
+  {
+    description:
+      "Use when a feature branch is complete and ready to merge or PR. Verifies tests, then presents 4 structured options (merge, PR, keep, discard). Never open-ended.",
+    inputSchema: z.object({
+      branch: z.string().describe("The feature branch name to finish"),
+      base_branch: z.string().describe("The target branch (e.g. main, master, develop)"),
+      test_command: z.string().optional().describe("Override test command (auto-detected otherwise)"),
+    }),
+  },
+  async (input) => handleFinishWork(root, input as any),
+);
+
+// ── Rule/Skill Testing ────────────────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "test_rule"),
+  {
+    description:
+      "Use BEFORE deploying a new rule or process document. Tests whether the rule actually changes agent behavior using RED/GREEN phases.",
+    inputSchema: z.object({
+      rule_path: z.string().describe("Relative path to the rule .md file being tested"),
+      test_scenario: z.string().describe("A realistic task description to test the rule against"),
+    }),
+  },
+  async (input) => handleTestRule(input as any),
+);
+
 mcp.registerTool(
   toolName(manifest, "get_guardrails"),
   {
     description:
-      "Returns the guardrails configured in manifest.yaml: blocked actions, actions requiring " +
-      "human approval, and allowed domains. Call this at session start alongside get_project_identity.",
+      "Use at session start alongside get_session_bootstrap. Returns blocked actions, required approvals, allowed domains, and active gates.",
     inputSchema: emptyArgs,
   },
   async () => handleGetGuardrails(manifest),
@@ -486,9 +617,7 @@ mcp.registerTool(
   toolName(manifest, "request_human_approval"),
   {
     description:
-      "Pauses execution and requests explicit human approval before performing a risky action. " +
-      "Always call this before actions listed in the guardrails require_approval list. " +
-      "Present the result to the user and wait for their response before continuing.",
+      "Use before risky actions (deploy, delete, charge). Pauses for explicit user approval. Required by guardrails require_approval list.",
     inputSchema: z.object({
       action: z.string().describe("The specific action the agent intends to perform."),
       context: z.string().describe("Why this action is needed and what the expected outcome is."),
@@ -505,8 +634,7 @@ mcp.registerTool(
   toolName(manifest, "verify_action"),
   {
     description:
-      "Verifies that a previous action produced the expected outcome by running post-condition checks. " +
-      "Use after any file write, code generation, or critical state change.",
+      "Use after file writes, code generation, or state changes to verify expected outcome.",
     inputSchema: z.object({
       description: z.string().describe("Human-readable description of what was just performed."),
       checks: z
@@ -520,6 +648,7 @@ mcp.registerTool(
                 "command_succeeds",
                 "http_status",
                 "json_contains",
+                "tdd_compliance",
               ])
               .describe("Type of check to perform."),
             path: z

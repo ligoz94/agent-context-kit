@@ -109,6 +109,36 @@ toolshed:
 #     - "localhost"
 #     - "staging.myapp.com"
 
+# ── Gates: Hard Process Gates ────────────────────────────────────────────────
+# When enabled, the agent MUST check these gates before proceeding.
+# Use `check_gate` to verify, `advance_gate` to pass with evidence.
+#
+# gates:
+#   require_design_approval: true     # HARD: no code until design is approved
+#   require_plan_review: true         # HARD: no execution until plan is reviewed
+#   require_tests_before_merge: true  # HARD: no merge until tests pass
+#   require_code_review: true         # HARD: no merge until code reviewed
+#   require_tests_before_code: true   # HARD: test must precede implementation
+
+# ── Session Bootstrap ────────────────────────────────────────────────────────
+# Controls what context the `get_session_bootstrap` tool returns at session start.
+#
+# session:
+#   bootstrap:
+#     auto_load_identity: true        # Load L0 (values, architecture, glossary)
+#     auto_load_context_policy: true  # Load L1 (context-policy.md)
+#     inject_greeting: |
+#       You have agent-context-kit enabled with hard gates.
+#       Run `get_session_bootstrap()` and `get_guardrails()` before starting.
+
+# ── Orchestration ────────────────────────────────────────────────────────────
+# Controls sub-agent dispatch behavior for `dispatch_subagent` tool.
+#
+# orchestration:
+#   subagent_model_fast: claude-3-5-haiku   # mechanical tasks
+#   subagent_model_standard: claude-3-5-sonnet # normal tasks
+#   default_model: standard                # fast | standard | capable
+
 # ── Profiles & Sub-agents ────────────────────────────────────────────────────
 # You can define partial manifest overrides for specific agents (e.g. backend vs frontend).
 # Load a profile with: npx @agent-context-kit/toolshed-server --profile=backend
@@ -124,6 +154,13 @@ toolshed:
 #       blocked_actions:
 #         - "modify css or styling"
 #         - "change react components"
+#   tdd:
+#     gates:
+#       require_tests_before_code: true
+#     rules:
+#       standards:
+#         - name: tdd
+#           path: docs/agent/standard-tdd.md
 
 # ── Mission Runtime (optional) ───────────────────────────────────────────────
 # Configuration for long-running orchestrator / worker / validator workflows.

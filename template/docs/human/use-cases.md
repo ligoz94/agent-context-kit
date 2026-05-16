@@ -48,6 +48,46 @@ Typical outcome:
 
 ---
 
+## Tool Reference
+
+agent-context-kit provides MCP tools in three categories. All tools use trigger-only descriptions (start with "Use when/Use after/Use before").
+
+### Context & Identity
+
+| Tool | What it does |
+|---|---|
+| `get_project_identity` | Loads L0 identity (values, architecture, glossary) |
+| `get_guardrails` | Shows blocked actions, required approvals, and active gates |
+| `get_session_bootstrap` | One-shot session start: loads identity + context policy + gate list |
+| `get_rules` | Loads coding standards and policies |
+| `list_registry` / `get_spec` | Browse and fetch feature specs |
+| `lookup_glossary` | Look up project-specific terms |
+| `get_learnings` | Past mistakes and lessons |
+| `search_context` | Full-text search across docs |
+| `validate_context` | Sanity-check doc paths |
+
+### Gate & Quality
+
+| Tool | What it does |
+|---|---|
+| `check_gate("gate_name")` | Verify a process gate has been passed. Halts if not. |
+| `advance_gate("gate_name", "evidence")` | Mark a gate as passed with supporting evidence |
+| `review_spec("path/to/spec.md")` | Check spec for completeness (TBDs, missing sections, scope creep) |
+| `review_plan("plan.md", "spec.md")` | Validate implementation plan against spec for coverage |
+| `verify_action(check_type)` | Run compliance checks (e.g. `tdd_compliance` for test-first ordering) |
+| `request_human_approval(action)` | Request human sign-off before risky operations |
+
+### Development Workflow
+
+| Tool | What it does |
+|---|---|
+| `dispatch_subagent(task, files, model)` | Produces a structured dispatch prompt for a sub-agent |
+| `finish_work(branch, base, test_cmd)` | Run tests, present structured release options |
+| `start_debugging(description)` | Initiates 4-phase forensic debugging process |
+| `test_rule(rule_path, scenario)` | RED/GREEN test a custom rule against a sub-agent |
+
+---
+
 ## How To Trigger These Flows In Chat
 
 There are two practical ways users normally invoke these workflows.
@@ -304,10 +344,15 @@ Flow:
 2. Let the agent call tools such as:
    - `get_project_identity`
    - `get_guardrails`
+   - `get_session_bootstrap`
    - `get_rules`
    - `list_registry`
    - `get_spec`
    - `get_learnings`
+   - `check_gate` / `advance_gate`
+   - `review_spec` / `review_plan`
+   - `finish_work`
+   - `start_debugging`
 3. Let the agent fetch context only when needed
 
 Concrete example:
@@ -318,9 +363,13 @@ Task: implement dark mode toggle
 Agent tool flow:
 - get_project_identity
 - get_guardrails
+- get_session_bootstrap
 - get_rules
 - list_registry
 - get_spec(dark-mode)
+- review_spec(specs/001-dark-mode.md)
+- advance_gate("design_approved", "Spec OK'd in sync")
+- finish_work("feat/dark-mode", "main", "npm test")
 ```
 
 Chat message a user can send:
@@ -808,6 +857,184 @@ This is the best flow when you want consistency both:
 
 - at task start,
 - and at PR handoff.
+
+---
+
+### Scenario 13: Run a structured gate-driven development workflow
+
+Problem:
+
+A development session drifts without clear stage gates, and the agent may skip testing or spec review.
+
+The tools work together as a pipeline. Below is every tool with its input/output shape and the role it plays in the flow.
+
+| Tool | Input | Output | Role |
+|---|---|---|---|
+| `get_session_bootstrap` | (none) | Markdown: identity + policy + gates | Session start |
+| `check_gate` | `gate_name` | Pass/fail with evidence or "not configured" | Guard before each stage |
+| `advance_gate` | `gate_name`, `evidence` | Confirmation | Mark stage complete |
+| `review_spec` | `spec_path` | Approved (no issues) or BLOCKING/ADVISORY with checklist | Before implementation |
+| `review_plan` | `plan_path`, `spec_path` | Approved or issues (placeholders, granularity, coverage) | Before coding |
+| `dispatch_subagent` | `task_description`, `context_files`, `model` | Dispatch contract + suggested prompt for sub-agent | Handoff |
+| `start_debugging` | `description` | 4-phase forensic guide | When tests fail |
+| `finish_work` | `branch`, `base_branch`, `test_command` | Release options (merge/PR/keep/discard) | Pre-push gate |
+| `verify_action` | `checks: [{type: "tdd_compliance"}]` | Pass/fail on test-first ordering | Quality check |
+| `test_rule` | `rule_path`, `test_scenario` | RED/GREEN test protocol for rules | When authoring rules |
+
+Concrete session — implementare coupon carrello:
+
+```text
+Utente: Implementa i coupon per il carrello. La spec è stata approvata in PR #42.
+
+─── STEP 1: Avvio sessione ────────────────────────────────────
+
+Agent chiama: get_session_bootstrap()
+Risposta:
+  ## Session Bootstrap — Start Here
+  ## Values
+  [valori del progetto...]
+  ## Architecture primer
+  [architettura...]
+  ## Context policy
+  [policy...]
+  ## Active Gates
+  - design_approved
+  - tests_before_code
+  Usa check_gate prima di procedere. Usa advance_gate con evidenza.
+
+─── STEP 2: Verifica gate design ──────────────────────────────
+
+Agent chiama: check_gate(gate_name="design_approved")
+Risposta:
+  Gate "design_approved": NOT PASSED. Evidence: none
+
+Agent: "Il gate design_approved non è stato superato.
+        Puoi fornire l'evidenza di approvazione della spec?
+        (es. link alla PR di review, messaggio di approvazione)"
+
+Utente: "Ecco la PR: https://github.com/mio/progetto/pull/42"
+
+Agent chiama: advance_gate(
+  gate_name="design_approved",
+  evidence="PR #42 approvata da @mirko il 15/05/2026"
+)
+Risposta:
+  Gate "design_approved" advanced. Evidence: PR #42 approvata da @mirko
+
+─── STEP 3: Review specifica ──────────────────────────────────
+
+Agent chiama: review_spec(
+  spec_path="docs/features/shopping-cart/specs/001-coupons.md"
+)
+Risposta:
+  ## Spec Review: ADVISORY
+  Spec: docs/features/shopping-cart/specs/001-coupons.md
+  - [completeness] Missing section: Security boundaries
+  - [completeness] Missing section: Failure states
+
+Agent: "La spec è completa all'80%. Manca la sezione 'Security boundaries'
+        (es. coupling coupon a utente, rate limiting) e 'Failure states'
+        (es. coupon scaduto mostra errore 400?).
+        Procedo con le sezioni mancanti documentate come rischio? [s/N]"
+
+Utente: "s"
+
+─── STEP 4: Dispatch sub-agente ──────────────────────────────
+
+Agent chiama: dispatch_subagent(
+  task_description="Implementare logica coupon carrello:
+                    1. Modello Coupon (codice, sconto, scadenza)
+                    2. Validazione coupon in checkout
+                    3. Test: coupon valido → sconto applicato
+                    4. Test: coupon scaduto → errore gentile",
+  context_files=[
+    "docs/features/shopping-cart/specs/001-coupons.md",
+    "docs/agent/standard-tdd.md"
+  ],
+  model="standard"
+)
+Risposta:
+  ## Dispatch Sub-agent
+  - Task: Implementare logica coupon carrello...
+  - Model hint: standard
+  - Context files: [spec, tdd doc]
+  - Status: DONE
+
+  Suggested dispatch prompt:
+  ```
+  You are a focused implementer.
+  Complete the task precisely. No scope creep.
+  Task: Implementare logica coupon carrello...
+  Return structured results:
+  - DONE: task completed
+  - DONE_WITH_CONCERNS: completed but flag doubts
+  - BLOCKED: cannot complete
+  ```
+
+(Agent usa Task tool per spawnare sub-agente con la dispatch prompt)
+
+─── STEP 5: Finish work ─────────────────────────────────────
+
+Sub-agente completato. Agent chiama:
+finish_work(
+  branch="feat/shopping-cart-coupons",
+  base_branch="main",
+  test_command="npm test"
+)
+
+Risposta (test passano):
+  ## Release: Ready
+  Branch: feat/shopping-cart-coupons → main
+  Tests: Tests passed: `npm test`
+
+  Options (choose one):
+  1. Merge locally — Merge feat/... into main, verify tests post-merge, delete branch.
+  2. Create PR — Push and create a pull request.
+  3. Keep branch — Keep branch and worktree as-is.
+  4. Discard — Permanently delete branch. Requires typed confirmation "discard".
+
+─── STEP 6: Verifica TDD compliance ─────────────────────────
+
+Agent chiama: check_gate(gate_name="tests_before_code")
+Risposta:
+  Gate "tests_before_code": NOT PASSED. Evidence: none
+
+Agent chiama: verify_action(
+  description="Verify TDD compliance for recent commits",
+  checks=[{type: "tdd_compliance"}]
+)
+Risposta (esempio):
+  ## Verify Action
+  Check "tdd_compliance":
+  - Git log: 5 commits analizzati
+  - Commit 1: "test: add coupon validation" (test)
+  - Commit 2: "feat: implement coupon validation" (code)
+  - Commit 3: "test: add coupon model" (test)
+  - Commit 4: "feat: add coupon model" (code)
+  - Risultato: PASSED — test commits precedono code commits
+
+Agent chiama: advance_gate(
+  gate_name="tests_before_code",
+  evidence="TDD compliance verificata via verify_action — test commits precedono code"
+)
+Risposta:
+  Gate "tests_before_code" advanced. Evidence: TDD compliance verificata...
+
+Agent: "Tutti i gate superati. Test passano. Cosa vuoi fare?
+        1. Merge locale  2. Creare PR  3. Tenere branch  4. Scartare"
+```
+
+Risultato:
+
+- ogni fase ha un pass/fail esplicito,
+- l'agente non salta mai testing o review,
+- l'umano interviene solo ai punti di decisione (approvazione, merge).
+
+Usa quando:
+
+- vuoi una pipeline di sviluppo ripetibile,
+- il tuo team vuole stage gates espliciti,
+- vuoi che gli agenti si fermino ai confini giusti e chiedano permesso.
 
 ---
 

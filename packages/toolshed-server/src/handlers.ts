@@ -1094,18 +1094,360 @@ export function handleRunMissionLoop(
   );
 }
 
+// ── Gate State (in-memory, per-session) ─────────────────────────────────────
+
+const gateStore = new Map<string, { passed: boolean; evidence: string | null }>();
+
+export function handleCheckGate(
+  manifest: Manifest,
+  input: { gate_name?: string },
+): ToolResult {
+  if (!input.gate_name) return err("gate_name is required (design_approved | plan_reviewed | tests_passed | code_reviewed | tests_before_code).");
+
+  const gates = manifest?.gates as Record<string, boolean> | undefined;
+  if (!gates || !gates[input.gate_name.replace(/-/g, "_")]) {
+    return ok(`Gate "${input.gate_name}" is not configured in manifest.yaml. No restriction.`);
+  }
+
+  const entry = gateStore.get(input.gate_name);
+  if (!entry || !entry.passed) {
+    return ok(`Gate "${input.gate_name}": NOT PASSED. Evidence: ${entry?.evidence ?? "none"}`);
+  }
+
+  return ok(`Gate "${input.gate_name}": PASSED. Evidence: ${entry.evidence}`);
+}
+
+export function handleAdvanceGate(
+  input: { gate_name?: string; evidence?: string },
+): ToolResult {
+  if (!input.gate_name) return err("gate_name is required.");
+  if (!input.evidence) return err("evidence is required (path or description of what proves compliance).");
+
+  gateStore.set(input.gate_name, { passed: true, evidence: input.evidence });
+  return ok(`Gate "${input.gate_name}" advanced. Evidence: ${input.evidence}`);
+}
+
+// ── Session Bootstrap ──────────────────────────────────────────────────────
+
+export function handleGetSessionBootstrap(manifest: Manifest, root: string): ToolResult {
+  const parts: string[] = [];
+
+  const session = manifest?.session as any;
+  const bootstrap = session?.bootstrap ?? {};
+
+  if (bootstrap.inject_greeting) {
+    parts.push(bootstrap.inject_greeting);
+  }
+
+  if (bootstrap.auto_load_identity !== false) {
+    const id = manifest?.identity as any;
+    const values = readFile(root, id?.values ?? "");
+    if (values) parts.push(`## Values\n\n${values}`);
+    const arch = readFile(root, id?.architecture ?? "");
+    if (arch) parts.push(`## Architecture primer\n\n${arch}`);
+    const glossary = readFile(root, id?.glossary ?? "");
+    if (glossary) parts.push(`## Glossary\n\n${glossary}`);
+  }
+
+  if (bootstrap.auto_load_context_policy !== false) {
+    const rules = manifest?.rules as any;
+    const policy = readFile(root, rules?.policy ?? "");
+    if (policy) parts.push(`## Context policy\n\n${policy}`);
+  }
+
+  // Include active gates
+  const gates = manifest?.gates as Record<string, boolean> | undefined;
+  if (gates) {
+    const active = Object.entries(gates).filter(([, v]) => v).map(([k]) => k.replace(/_/g, "-"));
+    if (active.length > 0) {
+      parts.push(`## Active Gates\n\nThe following gates are enforced:\n${active.map((g) => `- \`${g}\``).join("\n")}\n\nUse \`check_gate\` before proceeding past any gate. Use \`advance_gate\` when you have evidence.`);
+    }
+  }
+
+  if (parts.length === 0) {
+    return ok("## Session Bootstrap\n\nNo bootstrap context configured. Add a `session.bootstrap` section to manifest.yaml.");
+  }
+
+  return ok(`## Session Bootstrap — Start Here\n\n${parts.join("\n\n---\n\n")}`);
+}
+
+// ── Dispatch Sub-agent ─────────────────────────────────────────────────────
+
+export interface DispatchResult {
+  status: "DONE" | "DONE_WITH_CONCERNS" | "NEEDS_CONTEXT" | "BLOCKED";
+  summary: string;
+  concerns?: string[];
+  filesTouched?: string[];
+  suggestedAction?: string;
+}
+
+export function handleDispatchSubagent(
+  manifest: Manifest,
+  input: {
+    task_description?: string;
+    context_files?: string[];
+    model?: "fast" | "standard" | "capable";
+  },
+): ToolResult {
+  if (!input.task_description) return err("task_description is required.");
+
+  const orch = manifest?.orchestration as any;
+  const modelHint = input.model ?? orch?.default_model ?? "standard";
+
+  const contextSummary = input.context_files?.length
+    ? `Context files provided: ${input.context_files.join(", ")}`
+    : "No context files provided.";
+
+  const result: DispatchResult = {
+    status: "DONE",
+    summary: `[simulated] Sub-agent dispatched (model=${modelHint}): ${input.task_description}`,
+    concerns: [],
+    filesTouched: input.context_files ?? [],
+  };
+
+  return ok(
+    `## Dispatch Sub-agent\n\n- **Task:** ${input.task_description}\n- **Model hint:** ${modelHint}\n- ${contextSummary}\n- **Status:** ${result.status}\n\nNote: This tool describes the contract for sub-agent dispatch. In practice, the agent should use the Task tool to spawn a fresh sub-agent with the task_description as the prompt and context_files as reference.\n\n### Suggested dispatch prompt:\n\n\`\`\`\nYou are a focused implementer.\n${result.status === "NEEDS_CONTEXT" ? "Ask questions before starting." : "Complete the task precisely. No scope creep."}\nTask: ${input.task_description}\n\nReturn structured results:\n- DONE: task completed\n- DONE_WITH_CONCERNS: completed but flag doubts\n- NEEDS_CONTEXT: need more information\n- BLOCKED: cannot complete\n\`\`\``,
+  );
+}
+
+// ── Spec Review ────────────────────────────────────────────────────────────
+
+export function handleReviewSpec(
+  root: string,
+  input: { spec_path?: string },
+): ToolResult {
+  if (!input.spec_path) return err("spec_path is required.");
+
+  const content = readFile(root, input.spec_path);
+  if (!content) return err(`Spec file not found: ${input.spec_path}`);
+
+  const issues: string[] = [];
+
+  // Check for placeholders
+  if (/TBD|TODO|FIXME|incomplete/i.test(content)) {
+    issues.push("[completeness] Spec contains TBD, TODO, or FIXME placeholders.");
+  }
+
+  // Check sections
+  const categories = [
+    "Objective", "Constraints", "Non-goals", "Data inputs",
+    "Data outputs", "Failure states", "Security boundaries", "Acceptance criteria",
+  ];
+  for (const section of categories) {
+    const regex = new RegExp(`(^|\\n)(#+\\s+|\\*\\*)?${section}(:|\\*\\*|\\n|\\s)`, "i");
+    if (!regex.test(content)) {
+      issues.push(`[completeness] Missing Intent Engineering category: ${section}`);
+    }
+  }
+
+  // Check for scope creep signals
+  const multiSystem = /platform with|suite of|ecosystem of|multiple (independent )?(sub)?systems/i.test(content);
+  if (multiSystem) {
+    issues.push("[scope] Spec may describe multiple independent subsystems. Consider decomposing.");
+  }
+
+  // YAGNI check
+  if (/future.proof|pluggable|extensible (architecture|framework)/i.test(content)) {
+    issues.push("[yagni] Spec mentions future-proofing or pluggable architecture not requested.");
+  }
+
+  if (issues.length === 0) {
+    return ok(`## Spec Review: Approved\n\n**Spec:** ${input.spec_path}\n\nNo issues found. The spec is complete and ready for planning.`);
+  }
+
+  const severity = issues.filter((i) => i.startsWith("[completeness]")).length > 2 ? "BLOCKING" : "ADVISORY";
+  return ok(`## Spec Review: ${severity}\n\n**Spec:** ${input.spec_path}\n\n${issues.map((i) => `- ${i}`).join("\n")}\n\nRecommend fixing before proceeding to planning.`);
+}
+
+// ── Plan Review ────────────────────────────────────────────────────────────
+
+export function handleReviewPlan(
+  root: string,
+  input: { plan_path?: string; spec_path?: string },
+): ToolResult {
+  if (!input.plan_path) return err("plan_path is required.");
+  if (!input.spec_path) return err("spec_path is required (plan must be validated against spec).");
+
+  const planContent = readFile(root, input.plan_path);
+  if (!planContent) return err(`Plan file not found: ${input.plan_path}`);
+
+  const specContent = readFile(root, input.spec_path);
+  if (!specContent) return err(`Spec file not found: ${input.spec_path}`);
+
+  const issues: string[] = [];
+
+  // Check placeholders in plan
+  if (/TBD|TODO|FIXME/i.test(planContent)) {
+    issues.push("[completeness] Plan contains TBD, TODO, or FIXME placeholders.");
+  }
+
+  // Check task granularity (look for estimated durations)
+  const durationMatch = planContent.match(/\d+-?\d*\s*(min|hour|day)/gi);
+  const hasLargeTasks = durationMatch?.some((d) => /\d+/.test(d) && parseInt(/\d+/.exec(d)![0]) > 15);
+  if (hasLargeTasks) {
+    issues.push("[granularity] Some tasks may exceed 15 minutes. Target 2-5 minute tasks.");
+  }
+
+  // Check for missing file paths
+  if (!/Create:|Modify:|Test:|File:/i.test(planContent)) {
+    issues.push("[buildability] Plan lacks file path annotations (Create:/Modify:/Test:).");
+  }
+
+  // Check for spec coverage
+  const specKeywords = specContent
+    .split("\n")
+    .filter((l) => l.startsWith("##") || l.startsWith("**"))
+    .map((l) => l.replace(/[#*\s]/g, "").toLowerCase())
+    .filter(Boolean);
+
+  for (const keyword of specKeywords) {
+    if (keyword.length > 3 && !planContent.toLowerCase().includes(keyword)) {
+      issues.push(`[spec_alignment] Plan may not cover spec section: "${keyword}".`);
+      break; // one warning is enough
+    }
+  }
+
+  if (issues.length === 0) {
+    return ok(`## Plan Review: Approved\n\n**Plan:** ${input.plan_path}\n**Spec:** ${input.spec_path}\n\nPlan covers all spec requirements. Tasks are granular and actionable.`);
+  }
+
+  return ok(`## Plan Review: Issues Found\n\n**Plan:** ${input.plan_path}\n**Spec:** ${input.spec_path}\n\n${issues.map((i) => `- ${i}`).join("\n")}`);
+}
+
+// ── Forensic Debugging ─────────────────────────────────────────────────────
+
+export function handleStartDebugging(
+  input: { description?: string },
+): ToolResult {
+  if (!input.description) return err("description is required.");
+
+  return ok(`## Forensic Debugging: ${input.description}
+
+### Phase 1: Observe
+Get FRESH reproduction. Terminal output, not memory.
+- What exactly happens?
+- Where (component, module)?
+- Under what conditions (OS, browser, data)?
+- What changed recently? (\`git log --oneline -10\`, environment changes)
+
+### Phase 2: Hypothesize
+Generate 3 hypotheses ranked by probability.
+For each: what would prove it? What would disprove it?
+
+### Phase 3: Isolate
+One variable at a time. Document results.
+- Change ONE thing
+- Run
+- Record outcome
+
+### Phase 4: Fix & Fortify
+Fix root cause (not symptom).
+Then ask: what other system could fail the same way?
+Add defense for each identified risk.`);
+}
+
+// ── Finish Work / Release Engineering ──────────────────────────────────────
+
+export function handleFinishWork(
+  root: string,
+  input: {
+    branch?: string;
+    base_branch?: string;
+    test_command?: string;
+  },
+): ToolResult {
+  if (!input.branch) return err("branch is required.");
+  if (!input.base_branch) return err("base_branch is required.");
+
+  // Step 1: Check tests
+  const testCmd = input.test_command || (
+    ["npm test", "cargo test", "pytest", "go test ./...", "mvn test"]
+      .find((cmd) => {
+        try {
+          execSync(`which ${cmd.split(" ")[0]}`, { stdio: "ignore" });
+          return true;
+        } catch { return false; }
+      }) ?? "npm test"
+  );
+
+  let testsPass = true;
+  let testOutput = "Tests verification skipped (simulated).";
+  if (input.test_command) {
+    try {
+      execSync(input.test_command, { cwd: root, stdio: "pipe", timeout: 60000 });
+      testOutput = `Tests passed: \`${input.test_command}\``;
+    } catch {
+      testsPass = false;
+      testOutput = `Tests FAILED: \`${input.test_command}\`. Fix before merging.`;
+    }
+  }
+
+  if (!testsPass) {
+    return err(`## Release: Tests Blocking\n\n${testOutput}\n\nHARD GATE: Cannot proceed until tests pass.`);
+  }
+
+  return ok(`## Release: Ready
+
+**Branch:** ${input.branch} → ${input.base_branch}
+**Tests:** ${testOutput}
+
+### Options (choose one)
+
+1. **Merge locally** — Merge \`${input.branch}\` into \`${input.base_branch}\`, verify tests post-merge, delete branch.
+2. **Create PR** — Push and create a pull request. Title and test plan required.
+3. **Keep branch** — Keep branch and worktree as-is for later.
+4. **Discard** — Permanently delete branch and worktree. Requires typed confirmation "discard".
+
+Structured decision prevents scope creep. No open-ended questions.`);
+}
+
+// ── Test Rule / Skill TDD ──────────────────────────────────────────────────
+
+export function handleTestRule(
+  input: { rule_path?: string; test_scenario?: string },
+): ToolResult {
+  if (!input.rule_path) return err("rule_path is required.");
+  if (!input.test_scenario) return err("test_scenario is required.");
+
+  return ok(`## Test Rule: ${input.rule_path}
+
+**Scenario:** ${input.test_scenario}
+
+### RED Phase (without rule)
+1. Spawn fresh sub-agent
+2. Give them the test scenario
+3. Do NOT load ${input.rule_path}
+4. Observe: does the agent violate the expected behavior?
+5. Document the failure mode
+
+### GREEN Phase (with rule)
+1. Spawn fresh sub-agent
+2. Give them the test scenario
+3. LOAD ${input.rule_path}
+4. Observe: does the agent comply?
+5. Document the behavior
+
+### Verdict
+- If agent fails WITHOUT and passes WITH → rule works.
+- If agent behaves identically in both → rule is ineffective. Rewrite.
+- If agent fails in both → rule doesn't teach the right thing. Rethink.
+
+**Core principle:** If you didn't watch an agent fail without the rule, you don't know if the rule teaches the right thing.` );
+}
+
 // ── Guardrails Handlers ───────────────────────────────────────────────────────
 
 export function handleGetGuardrails(manifest: Manifest): ToolResult {
   const g = manifest?.guardrails as any;
+  const gates = manifest?.gates as Record<string, boolean> | undefined;
 
-  if (
-    !g ||
-    (!g.blocked_actions?.length && !g.require_approval?.length && !g.allowed_domains?.length)
-  ) {
+  const hasGuardrails = g && (g.blocked_actions?.length || g.require_approval?.length || g.allowed_domains?.length);
+  const hasGates = gates && Object.values(gates).some(Boolean);
+
+  if (!hasGuardrails && !hasGates) {
     return ok(
-      "## Guardrails\n\nNo guardrails configured. " +
-        "Add a `guardrails` section to manifest.yaml to constrain agent behavior.",
+      "## Guardrails\n\nNo guardrails or gates configured. " +
+        "Add a `guardrails` or `gates` section to manifest.yaml to constrain agent behavior.",
     );
   }
 
@@ -1136,6 +1478,17 @@ export function handleGetGuardrails(manifest: Manifest): ToolResult {
     );
   }
 
+  if (hasGates) {
+    const active = Object.entries(gates!)
+      .filter(([, v]) => v)
+      .map(([k]) => `- \`${k.replace(/_/g, "-")}\``);
+    parts.push(
+      "### 🚧 Active Gates\n" +
+        "The following hard gates are enforced. Use `check_gate` to verify, `advance_gate` to pass:\n\n" +
+        active.join("\n"),
+    );
+  }
+
   return ok(parts.join("\n\n---\n\n"));
 }
 
@@ -1148,6 +1501,22 @@ export interface ApprovalInput {
 export function handleRequestHumanApproval(input: ApprovalInput): ToolResult {
   if (!input.action) return err("'action' is required.");
   if (!input.context) return err("'context' is required.");
+
+  // Auto-advance a corresponding gate if action matches a known gate name
+  const actionLower = input.action.toLowerCase();
+  const gateMapping: Record<string, string> = {
+    "design": "design-approved",
+    "plan": "plan-reviewed",
+    "review": "code-reviewed",
+    "merge": "merge-approved",
+    "deploy": "deploy-approved",
+  };
+  for (const [keyword, gateName] of Object.entries(gateMapping)) {
+    if (actionLower.includes(keyword)) {
+      gateStore.set(gateName, { passed: false, evidence: `Awaiting approval for: ${input.action}` });
+      break;
+    }
+  }
 
   const riskLevel = input.risk_level ?? "medium";
   const riskEmoji = { low: "🟡", medium: "🟠", high: "🔴" }[riskLevel];
@@ -1169,6 +1538,8 @@ export function handleRequestHumanApproval(input: ApprovalInput): ToolResult {
     `**To cancel:** Reply with \`DENIED\` and optionally explain why.`,
     ``,
     `_The agent will not proceed until it receives explicit approval._`,
+    ``,
+    `**Gate chain note:** User approval is required before advancing past this point. When approved, run \`advance_gate\` with the appropriate gate name and evidence.`,
   ].join("\n");
 
   return ok(summary);
@@ -1181,7 +1552,8 @@ export interface VerifyCheck {
     | "file_modified_after"
     | "command_succeeds"
     | "http_status"
-    | "json_contains";
+    | "json_contains"
+    | "tdd_compliance";
   path?: string;
   command?: string;
   expected_status?: number;
@@ -1370,6 +1742,30 @@ export async function handleVerifyAction(
           passed: false,
           detail: `Could not process JSON in \`${check.path}\`: ${(e as Error).message}`,
         });
+      }
+      continue;
+    }
+
+    if (check.type === "tdd_compliance") {
+      try {
+        const logOutput = execSync("git log --oneline --diff-filter=ACMR --name-only -5", { cwd: root, encoding: "utf8", timeout: 10000 });
+        const lines = logOutput.split("\n").filter(Boolean);
+        const testCommits = lines.filter((l) => /test/i.test(l));
+        const codeFirst = lines.length > 0 && !testCommits.length;
+        if (codeFirst) {
+          results.push({ check, passed: false, detail: "Recent commits show code before tests. TDD requires test commit BEFORE code commit." });
+        } else if (testCommits.length > 0) {
+          const firstTestIdx = lines.findIndex((l) => /test/i.test(l));
+          const beforeTestCode = lines.slice(0, firstTestIdx).filter((l) => /\.(ts|js|py|rs|go|java)$/i.test(l) && !/test/i.test(l));
+          results.push({
+            check, passed: beforeTestCode.length === 0,
+            detail: beforeTestCode.length === 0 ? "TDD compliance OK: test commits precede code commits." : `TDD violation: ${beforeTestCode.length} code changes found before test commit.`,
+          });
+        } else {
+          results.push({ check, passed: true, detail: "TDD compliance check: no recent test commits found. Check performed (no violation detected)." });
+        }
+      } catch {
+        results.push({ check, passed: false, detail: "Could not run git log for TDD compliance check. Ensure this is a git repository." });
       }
       continue;
     }

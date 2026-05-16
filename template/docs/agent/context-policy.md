@@ -123,6 +123,29 @@ This mitigates _lost-in-the-middle_ degradation when the context window is long.
 - [evals/README.md](evals/README.md) — measuring spec gaps and context mistakes over time
 - [prompts/development-workflow.md](prompts/development-workflow.md) — pipeline, handoff, fresh-context review
 
+## Meta-cognition — 1% Rule
+
+Spend ~1% of your token budget on meta-cognition: explicitly state your plan, verify you're on the right track, and check for red flags. This is not wasted — it prevents costly detours.
+
+Before executing any plan longer than 3 steps, write a one-paragraph meta reply:
+
+```
+Plan: 1. read spec X, 2. grep for Y, 3. edit file Z, 4. run tests.
+Red flags: spec says read-only but change is a mutation; no regression test exists.
+```
+## Red Flags Table
+
+| Red flag | What to do |
+|---|---|
+| User asks for something that contradicts `values.md` | Halt. Quote the relevant value. Ask for clarification. |
+| Spec says read-only but implementation writes | Refuse. Surface the contradiction to the user. |
+| No regression test for a bug fix | Add one before fixing. If one exists already, say so. |
+| You can't find the spec for the area you're changing | Stop. Ask the user which feature/spec applies. |
+| Multiple specs contradict each other | Surface the contradiction. Do not pick a side silently. |
+| The task is ambiguous after reading L0 docs | Ask one focused question. Do not guess. |
+| A change affects a public API/interface | Check for consumers (grep imports). Update or notify. |
+| Security boundary crossed (e.g., raw SQL in handler) | Refuse. Point to the relevant rule or standard. |
+
 <!-- agent-context-kit:engine:end -->
 
 <!-- agent-context-kit:project:start -->

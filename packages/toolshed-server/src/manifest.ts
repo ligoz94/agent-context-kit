@@ -137,6 +137,33 @@ const BaseManifest = z.object({
 
 export const ManifestSchema = BaseManifest.extend({
   profiles: z.record(z.string(), BaseManifest).optional(),
+  gates: z
+    .object({
+      require_design_approval: z.boolean().optional(),
+      require_plan_review: z.boolean().optional(),
+      require_tests_before_merge: z.boolean().optional(),
+      require_code_review: z.boolean().optional(),
+      require_tests_before_code: z.boolean().optional(),
+    })
+    .optional(),
+  session: z
+    .object({
+      bootstrap: z
+        .object({
+          auto_load_identity: z.boolean().optional(),
+          auto_load_context_policy: z.boolean().optional(),
+          inject_greeting: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  orchestration: z
+    .object({
+      subagent_model_fast: z.string().optional(),
+      subagent_model_standard: z.string().optional(),
+      default_model: z.enum(["fast", "standard", "capable"]).optional(),
+    })
+    .optional(),
 });
 
 export type ManifestValid = z.infer<typeof ManifestSchema>;

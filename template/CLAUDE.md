@@ -10,18 +10,24 @@ If the **Toolshed** server is configured for this project (`manifest.yaml` at th
 
 | When | Tool |
 |------|------|
-| Session start / orientation | `get_project_identity`, **`get_guardrails`** |
+| Session start / orientation | `get_project_identity`, **`get_guardrails`**, **`get_session_bootstrap`** |
 | Before coding or review | `get_rules` (optionally `standard`: e.g. `testing`) |
 | Feature work | `list_registry` → `get_spec` with `name` — lazy L2, not all specs |
+| Spec / plan review | `review_spec`, `review_plan` |
 | Naming / domain terms | `lookup_glossary` |
 | Prompt files | `list_prompts`, `get_prompt` |
 | Avoid repeating past mistakes | `get_learnings` |
 | Find text across docs | `search_context` |
 | Sanity-check paths | `validate_context` |
+| Debugging | `start_debugging` (use after `finish_work` fails) |
+| Gate chain | `check_gate` → `advance_gate` |
+| Task handoff | `dispatch_subagent` (produces structured prompt for sub-agent) |
+| Finish work | `finish_work` (run before push/PR) |
+| Rule testing | `test_rule` (validate custom rules against examples) |
 
 **Write tools** (only when the user wants the repo updated): `add_learning`, `add_glossary_term`, `update_feature_status`.
 
-**Safety / verification**: use `request_human_approval` when guardrails say so; use `verify_action` after critical changes when appropriate.
+**Safety / verification**: use `request_human_approval` when guardrails say so; use `verify_action` after critical changes (pass check type `"tdd_compliance"` to verify test-first ordering).
 
 Do **not** fetch every feature spec; only the one needed for the current task.
 

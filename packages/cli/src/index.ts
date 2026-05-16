@@ -324,6 +324,11 @@ export async function cmdInit(cwd: string = process.cwd()) {
     "key-learnings.md",
     "app-config.md",
     "product-context.md",
+    "standard-tdd.md",
+    "forensic-debugging.md",
+    "code-review-reception.md",
+    "release-workflow.md",
+    "rationalization-tables.md",
   ];
 
   ensureDir(join(cwd, "docs/agent/prompts"));
@@ -505,7 +510,7 @@ export function cmdSync(cwd: string = process.cwd()) {
     process.exit(1);
   }
 
-  log("Syncing engine regions...");
+  log("Syncing engine regions and new docs...");
 
   const agentFiles = [
     "values.md",
@@ -515,13 +520,27 @@ export function cmdSync(cwd: string = process.cwd()) {
     "key-learnings.md",
     "app-config.md",
     "product-context.md",
+    "standard-tdd.md",
+    "forensic-debugging.md",
+    "code-review-reception.md",
+    "release-workflow.md",
+    "rationalization-tables.md",
   ];
 
   let synced = 0;
+  let created = 0;
   for (const f of agentFiles) {
     const dest = join(cwd, "docs/agent", f);
     const src = join(templateDir, "docs/agent", f);
     if (!existsSync(src)) continue;
+
+    if (!existsSync(dest)) {
+      copyTemplate(src, dest);
+      ok(`Created: docs/agent/${f}`);
+      created++;
+      continue;
+    }
+
     let template: string;
     try {
       template = readFileSync(src, "utf8");
@@ -535,10 +554,14 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
-  if (synced === 0) {
+  const parts: string[] = [];
+  if (created > 0) parts.push(`${created} file(s) created`);
+  if (synced > 0) parts.push(`${synced} file(s) updated (project regions preserved)`);
+
+  if (parts.length === 0) {
     log("All engine regions are up to date.");
   } else {
-    log(`${synced} file(s) updated. Project regions preserved.`);
+    log(parts.join(". ") + ".");
   }
 }
 

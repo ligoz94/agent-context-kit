@@ -630,6 +630,109 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
+  // ── Sync platform config files (cursor, claude, copilot, codex) ────────
+  const platformFiles: { src: string; dest: string; description: string }[] = [];
+
+  // CLAUDE.md (for Claude Code / Claude Desktop)
+  const claudeSrc = join(templateDir, "CLAUDE.md");
+  const claudeDest = join(cwd, "CLAUDE.md");
+  if (existsSync(claudeSrc)) platformFiles.push({ src: claudeSrc, dest: claudeDest, description: "CLAUDE.md" });
+
+  // .mcp.json (Claude Code MCP config — dynamically generated, not in template)
+  const claudeMcpDest = join(cwd, ".mcp.json");
+  if (!existsSync(claudeMcpDest)) {
+    writeWorkspaceMcpConfig(claudeMcpDest, "toolshed", {
+      command: "npx",
+      args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
+    });
+    ok("Created: .mcp.json");
+    created++;
+  }
+
+  // .cursor/rules/*.mdc
+  const cursorRulesSrc = join(templateDir, ".cursor/rules");
+  if (existsSync(cursorRulesSrc)) {
+    for (const name of readdirSync(cursorRulesSrc)) {
+      if (!name.endsWith(".mdc")) continue;
+      platformFiles.push({
+        src: join(cursorRulesSrc, name),
+        dest: join(cwd, ".cursor/rules", name),
+        description: `.cursor/rules/${name}`,
+      });
+    }
+  }
+
+  // .cursor/mcp.json (dynamically generated, not in template)
+  const mcpDest = join(cwd, ".cursor/mcp.json");
+  if (!existsSync(mcpDest)) {
+    ensureDir(dirname(mcpDest));
+    writeWorkspaceMcpConfig(mcpDest, "toolshed", {
+      command: "npx",
+      args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
+    });
+    ok("Created: .cursor/mcp.json");
+    created++;
+  }
+
+  // .cursor/hooks.json
+  const hooksJsonSrc = join(templateDir, ".cursor/hooks.json");
+  const hooksJsonDest = join(cwd, ".cursor/hooks.json");
+  if (existsSync(hooksJsonSrc)) platformFiles.push({ src: hooksJsonSrc, dest: hooksJsonDest, description: ".cursor/hooks.json" });
+
+  // .cursor/hooks/README.md
+  const hooksReadmeSrc = join(templateDir, ".cursor/hooks/README.md");
+  const hooksReadmeDest = join(cwd, ".cursor/hooks/README.md");
+  if (existsSync(hooksReadmeSrc)) platformFiles.push({ src: hooksReadmeSrc, dest: hooksReadmeDest, description: ".cursor/hooks/README.md" });
+
+  for (const pf of platformFiles) {
+    if (existsSync(pf.dest)) continue;
+    ensureDir(dirname(pf.dest));
+    copyTemplate(pf.src, pf.dest);
+    ok(`Created: ${pf.description}`);
+    created++;
+  }
+
+  // .github/copilot-instructions.md (not in template, generated)
+  const copilotDest = join(cwd, ".github/copilot-instructions.md");
+  if (!existsSync(copilotDest)) {
+    ensureDir(dirname(copilotDest));
+    writeFileSync(
+      copilotDest,
+      `# Copilot Instructions\n\n` +
+        `## Session start\n\n` +
+        `Call \`get_session_bootstrap()\` immediately if Toolshed MCP is available.\n` +
+        `This loads project identity, context policy, architecture, glossary, and active gates.\n` +
+        `If MCP is not available, read: docs/agent/values.md → docs/agent/context-policy.md → docs/agent/app-config.md\n` +
+        `Do not skip this step.\n` +
+        `\n` +
+        `## Context\n` +
+        `- Feature specs: docs/features/\n` +
+        `- Key learnings: docs/agent/key-learnings.md\n` +
+        `- Glossary: docs/agent/glossary.md\n`,
+    );
+    ok("Created: .github/copilot-instructions.md");
+    created++;
+  }
+
+  // AGENTS.md (not in template, generated)
+  const agentsDest = join(cwd, "AGENTS.md");
+  if (!existsSync(agentsDest)) {
+    writeFileSync(
+      agentsDest,
+      `# Agent Instructions\n\n` +
+        `## MANDATORY FIRST ACTION\n\n` +
+        `Call \`get_session_bootstrap()\` immediately if Toolshed MCP is available.\n` +
+        `This loads project identity, context policy, architecture, glossary, and active gates.\n` +
+        `If MCP is not available, read: docs/agent/values.md → docs/agent/architecture-primer.md → docs/agent/glossary.md\n\n` +
+        `## Context — load on demand\n\n` +
+        `- docs/agent/context-policy.md\n` +
+        `- docs/agent/key-learnings.md\n` +
+        `- docs/features/<name>.md  (relevant feature spec only)\n`,
+    );
+    ok("Created: AGENTS.md");
+    created++;
+  }
+
   const parts: string[] = [];
   if (created > 0) parts.push(`${created} file(s) created`);
   if (synced > 0) parts.push(`${synced} file(s) updated (project regions preserved)`);

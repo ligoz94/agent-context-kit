@@ -631,30 +631,29 @@ export function cmdSync(cwd: string = process.cwd()) {
   }
 
   // ── Sync platform config files (cursor, claude, copilot, codex) ────────
-  const platformFiles: { src: string; dest: string; description: string }[] = [];
+  const canonicalOverwrites: { src: string; dest: string; description: string }[] = [];
+  const projectFiles: { src: string; dest: string; description: string }[] = [];
 
-  // CLAUDE.md (for Claude Code / Claude Desktop)
+  // CLAUDE.md — project may customize, skip if exists
   const claudeSrc = join(templateDir, "CLAUDE.md");
-  const claudeDest = join(cwd, "CLAUDE.md");
-  if (existsSync(claudeSrc)) platformFiles.push({ src: claudeSrc, dest: claudeDest, description: "CLAUDE.md" });
+  if (existsSync(claudeSrc)) projectFiles.push({ src: claudeSrc, dest: join(cwd, "CLAUDE.md"), description: "CLAUDE.md" });
 
-  // .mcp.json (Claude Code MCP config — dynamically generated, not in template)
+  // .mcp.json — always regenerate (manifest path may change)
   const claudeMcpDest = join(cwd, ".mcp.json");
-  if (!existsSync(claudeMcpDest)) {
-    writeWorkspaceMcpConfig(claudeMcpDest, "toolshed", {
-      command: "npx",
-      args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
-    });
-    ok("Created: .mcp.json");
-    created++;
-  }
+  writeWorkspaceMcpConfig(claudeMcpDest, "toolshed", {
+    command: "npx",
+    args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
+  });
+  ok("Updated: .mcp.json");
+  created++;
 
-  // .cursor/rules/*.mdc
+  // .cursor/rules/ — canonical rules always overwritten, project-protocol kept
   const cursorRulesSrc = join(templateDir, ".cursor/rules");
   if (existsSync(cursorRulesSrc)) {
     for (const name of readdirSync(cursorRulesSrc)) {
       if (!name.endsWith(".mdc")) continue;
-      platformFiles.push({
+      const isProjectFile = name === "project-protocol.mdc";
+      (isProjectFile ? projectFiles : canonicalOverwrites).push({
         src: join(cursorRulesSrc, name),
         dest: join(cwd, ".cursor/rules", name),
         description: `.cursor/rules/${name}`,
@@ -662,29 +661,34 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
-  // .cursor/mcp.json (dynamically generated, not in template)
+  // .cursor/mcp.json — always regenerate
   const mcpDest = join(cwd, ".cursor/mcp.json");
-  if (!existsSync(mcpDest)) {
-    ensureDir(dirname(mcpDest));
-    writeWorkspaceMcpConfig(mcpDest, "toolshed", {
-      command: "npx",
-      args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
-    });
-    ok("Created: .cursor/mcp.json");
+  ensureDir(dirname(mcpDest));
+  writeWorkspaceMcpConfig(mcpDest, "toolshed", {
+    command: "npx",
+    args: ["-y", "@agent-context-kit/toolshed-server", "--manifest", join(cwd, "manifest.yaml")],
+  });
+  ok("Updated: .cursor/mcp.json");
+  created++;
+
+  // .cursor/hooks.json — project may customize, skip if exists
+  const hooksJsonSrc = join(templateDir, ".cursor/hooks.json");
+  if (existsSync(hooksJsonSrc)) projectFiles.push({ src: hooksJsonSrc, dest: join(cwd, ".cursor/hooks.json"), description: ".cursor/hooks.json" });
+
+  // .cursor/hooks/README.md — always overwritten (canonical)
+  const hooksReadmeSrc = join(templateDir, ".cursor/hooks/README.md");
+  if (existsSync(hooksReadmeSrc)) canonicalOverwrites.push({ src: hooksReadmeSrc, dest: join(cwd, ".cursor/hooks/README.md"), description: ".cursor/hooks/README.md" });
+
+  // Copy canonical files (always overwrite)
+  for (const pf of canonicalOverwrites) {
+    ensureDir(dirname(pf.dest));
+    copyTemplate(pf.src, pf.dest, true);
+    ok(`Updated: ${pf.description}`);
     created++;
   }
 
-  // .cursor/hooks.json
-  const hooksJsonSrc = join(templateDir, ".cursor/hooks.json");
-  const hooksJsonDest = join(cwd, ".cursor/hooks.json");
-  if (existsSync(hooksJsonSrc)) platformFiles.push({ src: hooksJsonSrc, dest: hooksJsonDest, description: ".cursor/hooks.json" });
-
-  // .cursor/hooks/README.md
-  const hooksReadmeSrc = join(templateDir, ".cursor/hooks/README.md");
-  const hooksReadmeDest = join(cwd, ".cursor/hooks/README.md");
-  if (existsSync(hooksReadmeSrc)) platformFiles.push({ src: hooksReadmeSrc, dest: hooksReadmeDest, description: ".cursor/hooks/README.md" });
-
-  for (const pf of platformFiles) {
+  // Copy project files (only if missing)
+  for (const pf of projectFiles) {
     if (existsSync(pf.dest)) continue;
     ensureDir(dirname(pf.dest));
     copyTemplate(pf.src, pf.dest);

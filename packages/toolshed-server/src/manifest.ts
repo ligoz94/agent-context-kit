@@ -144,6 +144,9 @@ export const ManifestSchema = BaseManifest.extend({
       require_tests_before_merge: z.boolean().optional(),
       require_code_review: z.boolean().optional(),
       require_tests_before_code: z.boolean().optional(),
+      require_spec_compliance: z.boolean().optional(),
+      require_code_quality: z.boolean().optional(),
+      require_verified_completion: z.boolean().optional(),
     })
     .optional(),
   session: z

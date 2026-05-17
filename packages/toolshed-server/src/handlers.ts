@@ -1102,7 +1102,7 @@ export function handleCheckGate(
   manifest: Manifest,
   input: { gate_name?: string },
 ): ToolResult {
-  if (!input.gate_name) return err("gate_name is required (design_approved | plan_reviewed | tests_passed | code_reviewed | tests_before_code).");
+  if (!input.gate_name) return err("gate_name is required (design_approved | plan_reviewed | tests_passed | code_reviewed | tests_before_code | spec_compliance | code_quality | verified_completion).");
 
   const gates = manifest?.gates as Record<string, boolean> | undefined;
   if (!gates || !gates[input.gate_name.replace(/-/g, "_")]) {
@@ -1125,6 +1125,338 @@ export function handleAdvanceGate(
 
   gateStore.set(input.gate_name, { passed: true, evidence: input.evidence });
   return ok(`Gate "${input.gate_name}" advanced. Evidence: ${input.evidence}`);
+}
+
+// ── Spec Compliance Review (post-implementation, sub-agent dispatch) ─────
+
+function extractSpecRequirements(specContent: string): string[] {
+  const requirements: string[] = [];
+  const lines = specContent.split("\n");
+
+  let inAcceptanceSection = false;
+  let inRequirementsSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^#{1,3}\s*(acceptance\s*criteria|requirements|scenarios)/i.test(trimmed)) {
+      inAcceptanceSection = true;
+      inRequirementsSection = false;
+      continue;
+    }
+    if (/^#{1,3}\s*(objective|non.goals|constraints|data\s*inputs|data\s*outputs|failure\s*states|security\s*boundaries)/i.test(trimmed)) {
+      inAcceptanceSection = false;
+      inRequirementsSection = false;
+      continue;
+    }
+
+    if (inAcceptanceSection || inRequirementsSection) {
+      const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+      if (bullet) { requirements.push(bullet[1]); continue; }
+      const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+      if (numbered) { requirements.push(numbered[1]); continue; }
+      if (/^#{1,3}\s/.test(trimmed)) { inAcceptanceSection = false; inRequirementsSection = false; }
+    }
+
+    const modalMatch = trimmed.match(/^(?:-\s+)?(?:the\s+)?(?:system|app|feature|api|component|user)\s+(must|should|shall)\s+(.+)$/i);
+    if (modalMatch && !inAcceptanceSection && !inRequirementsSection) {
+      requirements.push(`${modalMatch[2]} (${modalMatch[1].toLowerCase()})`);
+    }
+  }
+
+  return requirements.filter(Boolean);
+}
+
+export function handleReviewSpecCompliance(
+  root: string,
+  input: { spec_path?: string; implementation_paths?: string[] },
+): ToolResult {
+  if (!input.spec_path) return err("spec_path is required.");
+  if (!input.implementation_paths?.length) return err("implementation_paths is required (list of files to check against spec).");
+
+  const specContent = readFile(root, input.spec_path);
+  if (!specContent) return err(`Spec file not found: ${input.spec_path}`);
+
+  const requirements = extractSpecRequirements(specContent);
+
+  const fileList = input.implementation_paths.map((p) => `  - \`${p}\``).join("\n");
+  const reqList = requirements.map((r, i) => `  ${i + 1}. ${r}`).join("\n");
+
+  const dispatchPrompt = `You are a spec compliance reviewer. You are a FRESH sub-agent with no context from the implementation session.
+
+## CRITICAL: Do Not Trust the Report
+
+The implementer finished suspiciously quickly. Their report may be incomplete, inaccurate, or optimistic. You MUST verify everything independently.
+
+**DO NOT:**
+- Take their word for what they implemented
+- Trust their claims about completeness
+- Accept their interpretation of requirements
+
+**DO:**
+- Read the actual code in each file
+- Compare actual implementation to requirements line by line
+- Check for: **missing requirements** (did they skip something?), **extra work** (did they over-engineer?), **misunderstandings** (did they solve the wrong problem?)
+
+## Context
+
+**Spec file:** \`${input.spec_path}\`
+
+**Implementation files to review:**
+${fileList}
+
+**Requirements extracted from spec:**
+${reqList}
+
+## Output Format
+
+Return a structured review with:
+
+### ✅ Passed Requirements
+For each requirement that is correctly implemented, cite the file:line evidence.
+
+### ❌ Failed Requirements
+For each requirement that is NOT correctly implemented:
+- \`file:line\` — what's missing or wrong
+
+### ⚠️ Extra Work / Over-engineering
+List anything implemented that was NOT requested in the spec.
+
+### 🔍 Misunderstandings
+List anything that solves the wrong problem.
+
+### Summary
+- Total requirements: ${requirements.length}
+- Passed: X
+- Failed: Y
+- Verdict: PASSED (all requirements met, no extra work) or FAILED (with reasons)
+
+---
+
+Call \`advance_gate("spec_compliance", "<evidence>")\` only if you accept the result.`;
+
+  const output = [
+    `## Spec Compliance Review — Sub-agent Dispatch`,
+    ``,
+    `**Spec:** ${input.spec_path}`,
+    `**Files to review:** ${input.implementation_paths.length}`,
+    `**Requirements found:** ${requirements.length}`,
+    ``,
+    `This tool no longer performs keyword matching. It produces a structured dispatch prompt for a FRESH sub-agent who reads the actual code.`,
+    ``,
+    `### Dispatch the sub-agent with this prompt:`,
+    ``,
+    "```",
+    dispatchPrompt,
+    "```",
+    ``,
+    `Use \`dispatch_subagent\` or the Task tool to spawn the reviewer. When results are acceptable, call \`advance_gate("spec_compliance", "<evidence>")\`.`,
+  ].join("\n");
+
+  return ok(output);
+}
+
+// ── Code Quality Review (post-implementation) ─────────────────────────────
+
+export function handleReviewCodeQuality(
+  root: string,
+  input: {
+    paths?: string[];
+    lint_command?: string;
+    typecheck_command?: string;
+  },
+): ToolResult {
+  if (!input.paths?.length) return err("paths is required (list of files to review).");
+
+  const findings: { check: string; passed: boolean; detail: string }[] = [];
+
+  // 1. Lint
+  if (input.lint_command) {
+    try {
+      execSync(input.lint_command, { cwd: root, stdio: "pipe", timeout: 30000 });
+      findings.push({ check: "lint", passed: true, detail: `Lint passed: \`${input.lint_command}\`` });
+    } catch {
+      findings.push({ check: "lint", passed: false, detail: `Lint FAILED: \`${input.lint_command}\`. Fix lint errors before proceeding.` });
+    }
+  }
+
+  // 2. Typecheck
+  if (input.typecheck_command) {
+    try {
+      execSync(input.typecheck_command, { cwd: root, stdio: "pipe", timeout: 60000 });
+      findings.push({ check: "typecheck", passed: true, detail: `Typecheck passed: \`${input.typecheck_command}\`` });
+    } catch {
+      findings.push({ check: "typecheck", passed: false, detail: `Typecheck FAILED: \`${input.typecheck_command}\`. Fix type errors before proceeding.` });
+    }
+  }
+
+  // 3. File-level quality checks
+  for (const filePath of input.paths) {
+    const abs = resolve(root, filePath);
+    if (!existsSync(abs)) {
+      findings.push({ check: `file_exists: ${filePath}`, passed: false, detail: `File not found: ${filePath}` });
+      continue;
+    }
+
+    try {
+      const content = readFileSync(abs, "utf8");
+      const lines = content.split("\n");
+
+      // File size
+      if (lines.length > 500) {
+        findings.push({
+          check: `file_size: ${filePath}`,
+          passed: false,
+          detail: `${filePath} is ${lines.length} lines (limit: 500). Consider refactoring.`,
+        });
+      } else {
+        findings.push({
+          check: `file_size: ${filePath}`,
+          passed: true,
+          detail: `${filePath} is ${lines.length} lines (within 500 line limit).`,
+        });
+      }
+
+      // TODO/FIXME
+      const todos = [...content.matchAll(/TODO|FIXME|HACK|XXX/g)];
+      if (todos.length > 0) {
+        findings.push({
+          check: `todos: ${filePath}`,
+          passed: false,
+          detail: `${filePath} has ${todos.length} unresolved TODO/FIXME/HACK/XXX marker(s).`,
+        });
+      } else {
+        findings.push({
+          check: `todos: ${filePath}`,
+          passed: true,
+          detail: `${filePath} has no unresolved TODO/FIXME/HACK/XXX markers.`,
+        });
+      }
+
+      // Console.log (warning, not blocking)
+      const consoleLogs = [...content.matchAll(/console\.(log|warn|error)\s*\(/g)];
+      if (consoleLogs.length > 3) {
+        findings.push({
+          check: `console_log: ${filePath}`,
+          passed: false,
+          detail: `${filePath} has ${consoleLogs.length} console.${consoleLogs[0][1]}() calls. Use a proper logger in production code.`,
+        });
+      } else {
+        findings.push({
+          check: `console_log: ${filePath}`,
+          passed: true,
+          detail: `${filePath} uses minimal or no console calls (${consoleLogs.length} found).`,
+        });
+      }
+    } catch {
+      findings.push({ check: `read: ${filePath}`, passed: false, detail: `Could not read file: ${filePath}` });
+    }
+  }
+
+  const passed = findings.filter((f) => f.passed);
+  const failed = findings.filter((f) => !f.passed);
+
+  const output = [
+    `## Code Quality Review`,
+    ``,
+    `**Files reviewed:** ${input.paths.length}`,
+    `**Checks:** ${findings.length}`,
+    `**Passed:** ${passed.length}`,
+    `**Failed:** ${failed.length}`,
+    ``,
+    failed.length > 0 ? `### ❌ Failed Checks\n${failed.map((f) => `- [${f.check}] ${f.detail}`).join("\n")}\n` : "",
+    passed.length > 0 ? `### ✅ Passed Checks\n${passed.map((f) => `- [${f.check}] ${f.detail}`).join("\n")}\n` : "",
+    `### Summary`,
+    failed.length === 0 ? `✅ PASSED: All ${findings.length} quality checks passed.` : `❌ FAILED: ${failed.length} of ${findings.length} checks failed. Fix before merging.`,
+    ``,
+    `Call \`advance_gate("code_quality", "<evidence>")\` if you accept this result.`,
+  ].join("\n");
+
+  return failed.length === 0 ? ok(output) : err(output);
+}
+
+// ── Verification Before Completion (Final Sign-off) ───────────────────────
+
+export function handleVerifyCompletion(
+  root: string,
+  input: {
+    claim_description?: string;
+    claimed_outcome?: string;
+    verification_command?: string;
+  },
+): ToolResult {
+  if (!input.claim_description) return err("claim_description is required (e.g., 'Tests pass', 'Build succeeds').");
+  if (!input.claimed_outcome) return err("claimed_outcome is required (e.g., '0 failures', 'exit code 0').");
+  if (!input.verification_command) return err("verification_command is required. Run the command NOW to produce fresh evidence.");
+
+  // Check for rationalization language
+  const rationalizationPatterns = [
+    { pattern: /\bshould\b/i, label: '"should"' },
+    { pattern: /\bprobably\b/i, label: '"probably"' },
+    { pattern: /\bseems\s+to\b/i, label: '"seems to"' },
+    { pattern: /\bconfident\b/i, label: '"confident"' },
+    { pattern: /\btrust\b/i, label: '"trust"' },
+    { pattern: /\bmost\s+likely\b/i, label: '"most likely"' },
+  ];
+
+  const claimLower = input.claim_description + " " + input.claimed_outcome;
+  const foundRationalizations = rationalizationPatterns
+    .filter((r) => r.pattern.test(claimLower))
+    .map((r) => r.label);
+
+  if (foundRationalizations.length > 0) {
+    return err(
+      `## Verification: Rationalization Detected\n\n` +
+      `**Claim:** ${input.claim_description}\n` +
+      `**Expected:** ${input.claimed_outcome}\n\n` +
+      `❌ Claim contains rationalization language: ${foundRationalizations.join(", ")}\n\n` +
+      `Confidence ≠ evidence. RUN the verification command instead of expressing uncertainty.\n\n` +
+      `**"Claiming work is complete without verification is dishonesty, not efficiency."**\n\n` +
+      `Run: \`${input.verification_command}\``,
+    );
+  }
+
+  // Run verification command NOW (fresh)
+  let output = "";
+  let exitCode: number | null = null;
+  try {
+    const result = execSync(input.verification_command, {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 60000,
+      stdio: "pipe",
+    });
+    output = result.trim();
+    exitCode = 0;
+  } catch (e: any) {
+    output = (e.stdout || e.message || "").toString().trim();
+    exitCode = e.status ?? 1;
+  }
+
+  const outputLines = output.split("\n").slice(0, 30).join("\n");
+  const passed = exitCode === 0;
+
+  const lines = [
+    `## Verification: ${input.claim_description}`,
+    ``,
+    `**Expected:** ${input.claimed_outcome}`,
+    `**Command:** \`${input.verification_command}\``,
+    `**Exit code:** ${exitCode}`,
+    `**Result:** ${passed ? "✅ PASSED" : "❌ FAILED"}`,
+    ``,
+    passed ? "" : `### Evidence (fresh terminal output):\n\`\`\`\n${outputLines}\n\`\`\``,
+    ``,
+    passed
+      ? `**"NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE"** — verified fresh in this step.`
+      : `**"Claiming work is complete without verification is dishonesty, not efficiency."** Fix the issue and re-verify.`,
+    ``,
+    passed
+      ? `Call \`advance_gate("verified_completion", "${input.claim_description}: ${input.claimed_outcome}")\` to mark the final gate.`
+      : `Fix the issue, then call \`verify_completion\` again with the same or updated command.`,
+  ].join("\n");
+
+  return passed ? ok(lines) : err(lines);
 }
 
 // ── Session Bootstrap ──────────────────────────────────────────────────────
@@ -1330,9 +1662,16 @@ Get FRESH reproduction. Terminal output, not memory.
 - Under what conditions (OS, browser, data)?
 - What changed recently? (\`git log --oneline -10\`, environment changes)
 
+**Start the 5-Why trace:** Why does this symptom appear? Capture the surface-level answer.
+
 ### Phase 2: Hypothesize
 Generate 3 hypotheses ranked by probability.
 For each: what would prove it? What would disprove it?
+
+**Continue the 5-Why trace:** For the most probable hypothesis, ask "Why?" again. Document the chain:
+- Why 1: [surface cause]
+- Why 2: [underlying mechanism]
+- Why 3: [systemic gap]
 
 ### Phase 3: Isolate
 One variable at a time. Document results.
@@ -1340,10 +1679,25 @@ One variable at a time. Document results.
 - Run
 - Record outcome
 
-### Phase 4: Fix & Fortify
-Fix root cause (not symptom).
-Then ask: what other system could fail the same way?
-Add defense for each identified risk.`);
+**Continue the 5-Why trace:** Why 4 — what process or assumption allowed this cause to exist?
+
+### Phase 4: Fix Root Cause (not symptom)
+Fix at the deepest confirmed level from the 5-Why trace. Not the surface symptom.
+
+**Why 5 (final):** What in the team's development process allowed this root cause to reach production? (e.g., missing test, missing review check, ambiguous spec)
+
+### Phase 5: Fortify & Defense-in-Depth
+For EACH identified risk from the trace, add a defense:
+
+| Risk | Defense |
+|------|---------|
+| [from Why 1 — surface] | [add error handling, validation, or guard] |
+| [from Why 3 — systemic] | [add regression test, monitoring, or assert] |
+| [from Why 5 — process] | [add review check, lint rule, or team standard] |
+
+**Rule:** If you fixed one failure mode but the same category of bug can happen elsewhere, you haven't fixed the category. Engineering is not about fixing individual bugs — it's about making entire categories of bugs impossible.
+
+Then ask: what other system could fail the same way? Add defense for each identified risk.`);
 }
 
 // ── Finish Work / Release Engineering ──────────────────────────────────────

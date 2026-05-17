@@ -69,11 +69,14 @@ agent-context-kit provides MCP tools in three categories. All tools use trigger-
 ### Gate & Quality
 
 | Tool | What it does |
-|---|---|
+|---|---|---|
 | `check_gate("gate_name")` | Verify a process gate has been passed. Halts if not. |
 | `advance_gate("gate_name", "evidence")` | Mark a gate as passed with supporting evidence |
 | `review_spec("path/to/spec.md")` | Check spec for completeness (TBDs, missing sections, scope creep) |
 | `review_plan("plan.md", "spec.md")` | Validate implementation plan against spec for coverage |
+| `review_spec_compliance("spec.md", ["files…"])` | Post-implementation: dispatches fresh sub-agent to read actual code. Checks missing requirements, extra work, misunderstandings. Returns file:line findings |
+| `review_code_quality(["files…"], lint?, typecheck?)` | Post-implementation: lint, typecheck, file size limits, TODO/console.log detection |
+| `verify_completion("claim", "outcome", "command")` | Final sign-off gate. Requires FRESH terminal output. Rejects rationalization language (should, probably, seems to). Prevents claims without evidence |
 | `verify_action(check_type)` | Run compliance checks (e.g. `tdd_compliance` for test-first ordering) |
 | `request_human_approval(action)` | Request human sign-off before risky operations |
 
@@ -875,6 +878,9 @@ The tools work together as a pipeline. Below is every tool with its input/output
 | `advance_gate` | `gate_name`, `evidence` | Confirmation | Mark stage complete |
 | `review_spec` | `spec_path` | Approved (no issues) or BLOCKING/ADVISORY with checklist | Before implementation |
 | `review_plan` | `plan_path`, `spec_path` | Approved or issues (placeholders, granularity, coverage) | Before coding |
+| `review_spec_compliance` | `spec_path`, `implementation_paths` | Dispatch prompt for fresh sub-agent. Checks: missing requirements, extra work, misunderstandings with file:line | Post-implementation, gate 1 |
+| `review_code_quality` | `paths`, `lint_command?`, `typecheck_command?` | Lint/typecheck results + file-level quality flags (size, TODOs, console) | Post-implementation, gate 2 |
+| `verify_completion` | `claim_description`, `claimed_outcome`, `verification_command` | Fresh terminal evidence. Rejects rationalization (should, probably, seems to) | Post-implementation, final gate |
 | `dispatch_subagent` | `task_description`, `context_files`, `model` | Dispatch contract + suggested prompt for sub-agent | Handoff |
 | `start_debugging` | `description` | 4-phase forensic guide | When tests fail |
 | `finish_work` | `branch`, `base_branch`, `test_command` | Release options (merge/PR/keep/discard) | Pre-push gate |
@@ -973,9 +979,71 @@ Risposta:
 
 (Agent usa Task tool per spawnare sub-agente con la dispatch prompt)
 
-─── STEP 5: Finish work ─────────────────────────────────────
+─── STEP 5: Spec Compliance Gate (build the right thing?) ──
 
 Sub-agente completato. Agent chiama:
+review_spec_compliance(
+  spec_path="docs/features/shopping-cart/specs/001-coupons.md",
+  implementation_paths=[
+    "src/models/coupon.ts",
+    "src/services/coupon-validator.ts",
+    "src/handlers/checkout.ts",
+    "tests/coupon.test.ts"
+  ]
+)
+
+Risposta (esempio):
+  ## Spec Compliance Review
+  Spec: docs/features/shopping-cart/specs/001-coupons.md
+  Files checked: 4
+  Requirements found: 7
+  Covered: 6 (86%)
+  Uncovered: 1
+  ❌ Uncovered: "Coupon code is case-insensitive"
+    - No implementation file contained >=60% of keywords
+
+  Summary: PASSED: 86% coverage meets 80% threshold.
+
+Agent chiama: advance_gate(
+  gate_name="spec_compliance",
+  evidence="review_spec_compliance: 6/7 requirements covered (86%), 1 case-insensitivity gap documented as known limitation"
+)
+
+─── STEP 6: Code Quality Gate (build it well?) ──────────
+
+Agent chiama:
+review_code_quality(
+  paths=[
+    "src/models/coupon.ts",
+    "src/services/coupon-validator.ts",
+    "src/handlers/checkout.ts",
+  ],
+  lint_command="npm run lint",
+  typecheck_command="npx tsc --noEmit"
+)
+
+Risposta (esempio):
+  ## Code Quality Review
+  Files reviewed: 3
+  Checks: 9
+  Passed: 8
+  Failed: 1
+  ❌ [todos: src/handlers/checkout.ts] has 1 TODO marker
+  Summary: FAILED: 1 of 9 checks failed.
+
+Agent: "Il checkout ha un TODO rimasto. Lo risolvo?"
+Utente: "sì"
+
+(Agent fixes TODO, re-runs review_code_quality, gets all green.)
+
+Agent chiama: advance_gate(
+  gate_name="code_quality",
+  evidence="review_code_quality: 9/9 checks passed (lint ok, typecheck ok, no TODOs, file sizes ok)"
+)
+
+─── STEP 7: Finish work ─────────────────────────────────
+
+Agent chiama:
 finish_work(
   branch="feat/shopping-cart-coupons",
   base_branch="main",
@@ -993,7 +1061,7 @@ Risposta (test passano):
   3. Keep branch — Keep branch and worktree as-is.
   4. Discard — Permanently delete branch. Requires typed confirmation "discard".
 
-─── STEP 6: Verifica TDD compliance ─────────────────────────
+─── STEP 8: Verifica TDD compliance ─────────────────────────
 
 Agent chiama: check_gate(gate_name="tests_before_code")
 Risposta:
@@ -1020,8 +1088,31 @@ Agent chiama: advance_gate(
 Risposta:
   Gate "tests_before_code" advanced. Evidence: TDD compliance verificata...
 
-Agent: "Tutti i gate superati. Test passano. Cosa vuoi fare?
-        1. Merge locale  2. Creare PR  3. Tenere branch  4. Scartare"
+─── STEP 9: Verification Before Completion (Final Sign-off) ──
+
+Agent chiama: verify_completion(
+  claim_description="Tests pass and code is ready to merge",
+  claimed_outcome="npm test exits 0 with all tests passing",
+  verification_command="npm test"
+)
+
+Risposta (esempio):
+  ## Verification: Tests pass and code is ready to merge
+  Expected: npm test exits 0 with all tests passing
+  Command: npm test
+  Exit code: 0
+  Result: ✅ PASSED
+
+  "NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE"
+  — verified fresh in this step.
+
+Agent chiama: advance_gate(
+  gate_name="verified_completion",
+  evidence="verify_completion: npm test → exit 0, fresh output verified in this session"
+)
+
+Agent: "Tutti i gate superati (design → spec compliance → code quality → verified completion). Test passano con evidenza fresh. Cosa vuoi fare?
+         1. Merge locale  2. Creare PR  3. Tenere branch  4. Scartare"
 ```
 
 Risultato:

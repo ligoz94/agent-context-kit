@@ -50,6 +50,9 @@ import {
   handleRunMissionLoop,
   handleCheckGate,
   handleAdvanceGate,
+  handleReviewSpecCompliance,
+  handleReviewCodeQuality,
+  handleVerifyCompletion,
   handleGetSessionBootstrap,
   handleDispatchSubagent,
   handleReviewSpec,
@@ -484,7 +487,7 @@ mcp.registerTool(
     description:
       "Use before proceeding past a gated phase (design, plan, review, merge). Checks if the required gate has been passed with evidence.",
     inputSchema: z.object({
-      gate_name: z.string().describe("Gate name: design-approved, plan-reviewed, code-reviewed, tests-passed, tests-before-code"),
+      gate_name: z.string().describe("Gate name: design-approved, plan-reviewed, code-reviewed, tests-passed, tests-before-code, spec-compliance, code-quality, verified-completion"),
     }),
   },
   async (input) => handleCheckGate(manifest, input),
@@ -601,6 +604,49 @@ mcp.registerTool(
     }),
   },
   async (input) => handleTestRule(input as any),
+);
+
+// ── Post-Implementation Reviews ──────────────────────────────────────────
+
+mcp.registerTool(
+  toolName(manifest, "review_spec_compliance"),
+  {
+    description:
+      "Use AFTER implementation, BEFORE merging. Validates that the code covers all requirements from the spec. Checks implementation files for keyword evidence of each spec requirement. Second gate in the flow (spec compliance before code quality).",
+    inputSchema: z.object({
+      spec_path: z.string().describe("Relative path to the spec markdown file that was implemented against"),
+      implementation_paths: z.array(z.string()).describe("Relative paths to the files that were implemented or modified"),
+    }),
+  },
+  async (input) => handleReviewSpecCompliance(root, input),
+);
+
+mcp.registerTool(
+  toolName(manifest, "review_code_quality"),
+  {
+    description:
+      "Use AFTER spec compliance passes, BEFORE merge. Runs lint/typecheck, checks file sizes, flags TODOs and console.log calls. Third gate in the flow (spec compliance -> code quality -> merge).",
+    inputSchema: z.object({
+      paths: z.array(z.string()).describe("Relative paths to implementation files to review"),
+      lint_command: z.string().optional().describe("Shell command for linting (e.g. 'npm run lint'). Omit to skip"),
+      typecheck_command: z.string().optional().describe("Shell command for type checking (e.g. 'npx tsc --noEmit'). Omit to skip"),
+    }),
+  },
+  async (input) => handleReviewCodeQuality(root, input as any),
+);
+
+mcp.registerTool(
+  toolName(manifest, "verify_completion"),
+  {
+    description:
+      "Use AFTER spec compliance and code quality pass, BEFORE claiming work is complete. Requires FRESH terminal output (not 'I ran it before'). Rejects rationalization language (should, probably, seems to). Final gate: spec compliance → code quality → verified completion.",
+    inputSchema: z.object({
+      claim_description: z.string().describe("What you are claiming (e.g. 'Tests pass', 'Build succeeds', 'Bug fixed')"),
+      claimed_outcome: z.string().describe("The expected outcome (e.g. '0 failures', 'exit code 0')"),
+      verification_command: z.string().describe("The FULL command to run NOW for fresh evidence"),
+    }),
+  },
+  async (input) => handleVerifyCompletion(root, input as any),
 );
 
 mcp.registerTool(

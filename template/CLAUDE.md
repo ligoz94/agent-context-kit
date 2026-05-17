@@ -30,6 +30,9 @@ If the **Toolshed** server is configured for this project (`manifest.yaml` at th
 | Sanity-check paths | `validate_context` |
 | Debugging | `start_debugging` (use after `finish_work` fails) |
 | Gate chain | `check_gate` → `advance_gate` |
+| Spec compliance | `review_spec_compliance` (dispatches fresh sub-agent to read actual code, check missing/extra/misunderstood work) |
+| Code quality | `review_code_quality` (lint, typecheck, file size, TODOs) |
+| Verification gate | `verify_completion` (final sign-off: fresh terminal output required, rejects rationalization language) |
 | Task handoff | `dispatch_subagent` (produces structured prompt for sub-agent) |
 | Finish work | `finish_work` (run before push/PR) |
 | Rule testing | `test_rule` (validate custom rules against examples) |

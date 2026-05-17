@@ -29,6 +29,9 @@ import {
   handleRunMissionLoop,
   handleCheckGate,
   handleAdvanceGate,
+  handleReviewSpecCompliance,
+  handleReviewCodeQuality,
+  handleVerifyCompletion,
   handleGetSessionBootstrap,
   handleDispatchSubagent,
   handleReviewSpec,
@@ -544,7 +547,7 @@ export function createContextKitTools(
       description:
         "Use before proceeding past a gated phase (design, plan, review, merge). Checks if the required gate has been passed with evidence.",
       schema: z.object({
-        gate_name: z.string().describe("Gate name: design-approved, plan-reviewed, code-reviewed, tests-passed, tests-before-code"),
+        gate_name: z.string().describe("Gate name: design-approved, plan-reviewed, code-reviewed, tests-passed, tests-before-code, spec-compliance, code-quality, verified-completion"),
       }),
       func: async (input: any) => {
         const res = handleCheckGate(manifest, input);
@@ -568,115 +571,52 @@ export function createContextKitTools(
       },
     }),
 
-    // ── Session Bootstrap ────────────────────────────────────────────────────
+    // ── Post-Implementation Reviews ───────────────────────────────────────
 
     new DynamicStructuredTool<any>({
-      name: toolName(manifest, "get_session_bootstrap"),
+      name: toolName(manifest, "review_spec_compliance"),
       description:
-        "Use at the VERY START of any session. Returns layered context (L0 identity, L1 policy, active gates) so you don't start blank.",
-      schema: z.object({}),
-      func: async () => {
-        const res = handleGetSessionBootstrap(manifest, root);
-        if (res.isError) throw new Error(res.content[0].text);
-        return res.content[0].text;
-      },
-    }),
-
-    // ── Sub-agent Dispatch ───────────────────────────────────────────────────
-
-    new DynamicStructuredTool<any>({
-      name: toolName(manifest, "dispatch_subagent"),
-      description:
-        "Use to delegate a focused task to a fresh sub-agent with isolated context. Never inherit current session history. Returns structured status.",
+        "Use AFTER implementation, BEFORE merging. Validates that the code covers all requirements from the spec. Checks implementation files for keyword evidence of each spec requirement. Second gate in the flow (spec compliance before code quality).",
       schema: z.object({
-        task_description: z.string().describe("The precise task for the sub-agent, including file paths and expected outcome"),
-        context_files: z.array(z.string()).optional().describe("Relative paths to files the sub-agent needs as reference"),
-        model: z.enum(["fast", "standard", "capable"]).optional().describe("Model capability hint: fast for mechanical, capable for architecture/review"),
+        spec_path: z.string().describe("Relative path to the spec markdown file that was implemented against"),
+        implementation_paths: z.array(z.string()).describe("Relative paths to the files that were implemented or modified"),
       }),
       func: async (input: any) => {
-        const res = handleDispatchSubagent(manifest, input);
-        if (res.isError) throw new Error(res.content[0].text);
-        return res.content[0].text;
-      },
-    }),
-
-    // ── Reviews ──────────────────────────────────────────────────────────────
-
-    new DynamicStructuredTool<any>({
-      name: toolName(manifest, "review_spec"),
-      description:
-        "Use AFTER writing a design spec, BEFORE creating an implementation plan. Checks completeness, consistency, scope, and YAGNI. Dispatched as fresh review.",
-      schema: z.object({
-        spec_path: z.string().describe("Relative path to the spec markdown file"),
-      }),
-      func: async (input: any) => {
-        const res = handleReviewSpec(root, input);
+        const res = handleReviewSpecCompliance(root, input);
         if (res.isError) throw new Error(res.content[0].text);
         return res.content[0].text;
       },
     }),
 
     new DynamicStructuredTool<any>({
-      name: toolName(manifest, "review_plan"),
+      name: toolName(manifest, "review_code_quality"),
       description:
-        "Use AFTER writing an implementation plan, BEFORE executing. Validates plan covers all spec requirements, tasks are granular (2-5 min), and file paths are explicit.",
+        "Use AFTER spec compliance passes, BEFORE merge. Runs lint/typecheck, checks file sizes, flags TODOs and console.log calls. Third gate in the flow (spec compliance -> code quality -> merge).",
       schema: z.object({
-        plan_path: z.string().describe("Relative path to the plan markdown file"),
-        spec_path: z.string().describe("Relative path to the spec the plan was derived from"),
+        paths: z.array(z.string()).describe("Relative paths to implementation files to review"),
+        lint_command: z.string().optional().describe("Shell command for linting (e.g. 'npm run lint'). Omit to skip"),
+        typecheck_command: z.string().optional().describe("Shell command for type checking (e.g. 'npx tsc --noEmit'). Omit to skip"),
       }),
       func: async (input: any) => {
-        const res = handleReviewPlan(root, input);
+        const res = handleReviewCodeQuality(root, input);
         if (res.isError) throw new Error(res.content[0].text);
         return res.content[0].text;
       },
     }),
 
-    // ── Debugging ────────────────────────────────────────────────────────────
+    // ── Verification Before Completion ─────────────────────────────────────
 
     new DynamicStructuredTool<any>({
-      name: toolName(manifest, "start_debugging"),
+      name: toolName(manifest, "verify_completion"),
       description:
-        "Use when investigating a bug. Guides through 4-phase forensic process: Observe, Hypothesize, Isolate, Fix & Fortify. Not for simple issues.",
+        "Use AFTER spec compliance and code quality pass, BEFORE claiming work is complete. Requires FRESH terminal output (not 'I ran it before'). Rejects rationalization language (should, probably, seems to). Final gate: spec compliance -> code quality -> verified completion.",
       schema: z.object({
-        description: z.string().describe("What bug or unexpected behavior are you investigating?"),
+        claim_description: z.string().describe("What you are claiming (e.g. 'Tests pass', 'Build succeeds', 'Bug fixed')"),
+        claimed_outcome: z.string().describe("The expected outcome (e.g. '0 failures', 'exit code 0')"),
+        verification_command: z.string().describe("The FULL command to run NOW for fresh evidence"),
       }),
       func: async (input: any) => {
-        const res = handleStartDebugging(input);
-        if (res.isError) throw new Error(res.content[0].text);
-        return res.content[0].text;
-      },
-    }),
-
-    // ── Release Engineering ──────────────────────────────────────────────────
-
-    new DynamicStructuredTool<any>({
-      name: toolName(manifest, "finish_work"),
-      description:
-        "Use when a feature branch is complete and ready to merge or PR. Verifies tests, then presents 4 structured options (merge, PR, keep, discard). Never open-ended.",
-      schema: z.object({
-        branch: z.string().describe("The feature branch name to finish"),
-        base_branch: z.string().describe("The target branch (e.g. main, master, develop)"),
-        test_command: z.string().optional().describe("Override test command (auto-detected otherwise)"),
-      }),
-      func: async (input: any) => {
-        const res = await handleFinishWork(root, input);
-        if (res.isError) throw new Error(res.content[0].text);
-        return res.content[0].text;
-      },
-    }),
-
-    // ── Rule/Skill Testing ───────────────────────────────────────────────────
-
-    new DynamicStructuredTool<any>({
-      name: toolName(manifest, "test_rule"),
-      description:
-        "Use BEFORE deploying a new rule or process document. Tests whether the rule actually changes agent behavior using RED/GREEN phases.",
-      schema: z.object({
-        rule_path: z.string().describe("Relative path to the rule .md file being tested"),
-        test_scenario: z.string().describe("A realistic task description to test the rule against"),
-      }),
-      func: async (input: any) => {
-        const res = handleTestRule(input);
+        const res = handleVerifyCompletion(root, input);
         if (res.isError) throw new Error(res.content[0].text);
         return res.content[0].text;
       },

@@ -16,6 +16,8 @@ Keep this file **small and imperative**: session routing and non-negotiables onl
 
 If the **Toolshed** server is configured for this project (`manifest.yaml` at the project root), use the MCP tools as the primary way to pull context:
 
+<!-- agent-context-kit:engine:start -->
+
 | When | Tool |
 |------|------|
 | Session start / orientation | `get_project_identity`, **`get_guardrails`**, **`get_session_bootstrap`** |
@@ -36,6 +38,8 @@ If the **Toolshed** server is configured for this project (`manifest.yaml` at th
 | Task handoff | `dispatch_subagent` (produces structured prompt for sub-agent) |
 | Finish work | `finish_work` (run before push/PR) |
 | Rule testing | `test_rule` (validate custom rules against examples) |
+
+<!-- agent-context-kit:engine:end -->
 
 **Write tools** (only when the user wants the repo updated): `add_learning`, `add_glossary_term`, `update_feature_status`.
 

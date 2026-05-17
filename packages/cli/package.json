@@ -1,6 +1,6 @@
 {
   "name": "@agent-context-kit/cli",
-  "version": "0.3.33",
+  "version": "0.3.34",
   "type": "module",
   "description": "CLI for agent-context-kit",
   "main": "dist/index.js",

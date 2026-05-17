@@ -583,15 +583,38 @@ export function cmdSync(cwd: string = process.cwd()) {
     }
   }
 
-  // ── Sync prompt files — create missing ones ──────────────────────────────
+  // ── Sync engine regions in CLAUDE.md ──────────────────────────────────────
+  const claudeMdDest = join(cwd, "CLAUDE.md");
+  const claudeMdSrc = join(templateDir, "CLAUDE.md");
+  if (existsSync(claudeMdDest) && existsSync(claudeMdSrc)) {
+    const tmpl = readFileSync(claudeMdSrc, "utf8");
+    if (syncEngineRegions(claudeMdDest, tmpl)) {
+      ok("Synced: CLAUDE.md (engine regions updated)");
+      synced++;
+    }
+  }
+
+  // ── Sync engine regions in docs/human/use-cases.md ───────────────────────
+  const ucDest = join(cwd, "docs/human/use-cases.md");
+  const ucSrc = join(templateDir, "docs/human/use-cases.md");
+  if (existsSync(ucDest) && existsSync(ucSrc)) {
+    const tmpl = readFileSync(ucSrc, "utf8");
+    if (syncEngineRegions(ucDest, tmpl)) {
+      ok("Synced: docs/human/use-cases.md (engine regions updated)");
+      synced++;
+    }
+  }
+
+  // ── Sync prompt files — always overwrite from template ──────────────────
   const promptsDir = join(templateDir, "docs/agent/prompts");
   if (existsSync(promptsDir)) {
     for (const name of readdirSync(promptsDir)) {
       if (name === ".gitkeep" || !statSync(join(promptsDir, name)).isFile()) continue;
       const dest = join(cwd, "docs/agent/prompts", name);
-      if (existsSync(dest)) continue;
-      copyTemplate(join(promptsDir, name), dest);
-      ok(`Created: docs/agent/prompts/${name}`);
+      const src = join(promptsDir, name);
+      const existed = existsSync(dest);
+      copyTemplate(src, dest, true);
+      ok(`${existed ? "Updated" : "Created"}: docs/agent/prompts/${name}`);
       created++;
     }
   }

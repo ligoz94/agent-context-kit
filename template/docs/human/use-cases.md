@@ -871,8 +871,10 @@ A development session drifts without clear stage gates, and the agent may skip t
 
 The tools work together as a pipeline. Below is every tool with its input/output shape and the role it plays in the flow.
 
+<!-- agent-context-kit:engine:start -->
+
 | Tool | Input | Output | Role |
-|---|---|---|---|
+|---|---|---|---|---|
 | `get_session_bootstrap` | (none) | Markdown: identity + policy + gates | Session start |
 | `check_gate` | `gate_name` | Pass/fail with evidence or "not configured" | Guard before each stage |
 | `advance_gate` | `gate_name`, `evidence` | Confirmation | Mark stage complete |
@@ -886,6 +888,8 @@ The tools work together as a pipeline. Below is every tool with its input/output
 | `finish_work` | `branch`, `base_branch`, `test_command` | Release options (merge/PR/keep/discard) | Pre-push gate |
 | `verify_action` | `checks: [{type: "tdd_compliance"}]` | Pass/fail on test-first ordering | Quality check |
 | `test_rule` | `rule_path`, `test_scenario` | RED/GREEN test protocol for rules | When authoring rules |
+
+<!-- agent-context-kit:engine:end -->
 
 Concrete session — implementare coupon carrello:
 

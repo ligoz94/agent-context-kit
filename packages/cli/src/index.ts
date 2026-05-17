@@ -98,14 +98,15 @@ export function ensureDir(p: string) {
 }
 
 export function copyTemplate(src: string, dest: string, force = false) {
-  if (existsSync(dest) && !force) {
+  const existed = existsSync(dest);
+  if (existed && !force) {
     warn(`Skipped (exists): ${relative(process.cwd(), dest)}`);
     return;
   }
   ensureDir(dirname(dest));
   try {
     writeFileSync(dest, readFileSync(src, "utf8"));
-    ok(`Created: ${relative(process.cwd(), dest)}`);
+    if (!force) ok(`Created: ${relative(process.cwd(), dest)}`);
   } catch (e) {
     fail(`Cannot write file: ${dest} — ${(e as Error).message}`);
     throw e;
@@ -252,6 +253,12 @@ export function syncEngineRegions(filePath: string, templateContent: string): bo
   }
 
   if (templateRegions.length === 0) return false;
+
+  // If file has no engine markers, append the first template engine region
+  if (!existing.includes("<!-- agent-context-kit:engine:start -->")) {
+    writeFileSync(filePath, `${existing.trimEnd()}\n\n${templateRegions[0]}\n`);
+    return true;
+  }
 
   let updated = existing;
   let regionIndex = 0;
@@ -586,6 +593,11 @@ export function cmdSync(cwd: string = process.cwd()) {
   // ── Sync engine regions in CLAUDE.md ──────────────────────────────────────
   const claudeMdDest = join(cwd, "CLAUDE.md");
   const claudeMdSrc = join(templateDir, "CLAUDE.md");
+  if (!existsSync(claudeMdDest) && existsSync(claudeMdSrc)) {
+    writeFileSync(claudeMdDest, readFileSync(claudeMdSrc, "utf8"));
+    ok("Created: CLAUDE.md");
+    created++;
+  }
   if (existsSync(claudeMdDest) && existsSync(claudeMdSrc)) {
     const tmpl = readFileSync(claudeMdSrc, "utf8");
     if (syncEngineRegions(claudeMdDest, tmpl)) {
@@ -597,6 +609,12 @@ export function cmdSync(cwd: string = process.cwd()) {
   // ── Sync engine regions in docs/human/use-cases.md ───────────────────────
   const ucDest = join(cwd, "docs/human/use-cases.md");
   const ucSrc = join(templateDir, "docs/human/use-cases.md");
+  if (!existsSync(ucDest) && existsSync(ucSrc)) {
+    ensureDir(dirname(ucDest));
+    writeFileSync(ucDest, readFileSync(ucSrc, "utf8"));
+    ok("Created: docs/human/use-cases.md");
+    created++;
+  }
   if (existsSync(ucDest) && existsSync(ucSrc)) {
     const tmpl = readFileSync(ucSrc, "utf8");
     if (syncEngineRegions(ucDest, tmpl)) {
@@ -613,15 +631,22 @@ export function cmdSync(cwd: string = process.cwd()) {
       const dest = join(cwd, "docs/agent/prompts", name);
       const src = join(promptsDir, name);
       const existed = existsSync(dest);
-      copyTemplate(src, dest, true);
+      ensureDir(dirname(dest));
+      writeFileSync(dest, readFileSync(src, "utf8"));
       ok(`${existed ? "Updated" : "Created"}: docs/agent/prompts/${name}`);
       created++;
     }
   }
 
-  // ── Sync manifest.yaml — add missing sections ───────────────────────────
+  // ── Sync manifest.yaml — create if missing, then add missing sections ──
   const manifestDest = join(cwd, "manifest.yaml");
   const manifestSrc = join(templateDir, "manifest.yaml");
+  if (!existsSync(manifestDest) && existsSync(manifestSrc)) {
+    ensureDir(dirname(manifestDest));
+    writeFileSync(manifestDest, readFileSync(manifestSrc, "utf8"));
+    ok("Created: manifest.yaml");
+    created++;
+  }
   let manifestUpdated = false;
   if (existsSync(manifestDest) && existsSync(manifestSrc)) {
     let existing = readFileSync(manifestDest, "utf8");
@@ -642,9 +667,28 @@ export function cmdSync(cwd: string = process.cwd()) {
 
     for (const section of sections) {
       const headerPattern = section.header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (new RegExp(headerPattern, "m").test(existing)) continue;
-      existing = `${existing.trimEnd()}\n\n${section.header}\n${section.content.trimEnd()}\n`;
-      manifestUpdated = true;
+      const headerRegex = new RegExp(headerPattern, "m");
+      if (!headerRegex.test(existing)) {
+        // Section header not found → append entire section
+        existing = `${existing.trimEnd()}\n\n${section.header}\n${section.content.trimEnd()}\n`;
+        manifestUpdated = true;
+      } else {
+        // Section exists → replace its content with template's commented-out version
+        const headerMatch = existing.match(headerRegex);
+        if (!headerMatch) continue;
+        const hdr = headerMatch[0];
+        const afterHeader = existing.slice(existing.indexOf(hdr) + hdr.length);
+        const nextSectionMatch = afterHeader.match(/\n(?=# ── )/);
+        const existingContent = nextSectionMatch
+          ? afterHeader.slice(0, nextSectionMatch.index)
+          : afterHeader;
+        const newSection = `${hdr}${section.content.replace(/\n$/, "")}`;
+        existing = existing.replace(
+          `${hdr}${existingContent}`,
+          newSection,
+        );
+        manifestUpdated = true;
+      }
     }
 
     if (manifestUpdated) {

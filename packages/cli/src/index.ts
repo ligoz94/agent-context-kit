@@ -673,21 +673,29 @@ export function cmdSync(cwd: string = process.cwd()) {
         existing = `${existing.trimEnd()}\n\n${section.header}\n${section.content.trimEnd()}\n`;
         manifestUpdated = true;
       } else {
-        // Section exists → replace its content with template's commented-out version
-        const headerMatch = existing.match(headerRegex);
-        if (!headerMatch) continue;
-        const hdr = headerMatch[0];
-        const afterHeader = existing.slice(existing.indexOf(hdr) + hdr.length);
-        const nextSectionMatch = afterHeader.match(/\n(?=# ── )/);
-        const existingContent = nextSectionMatch
-          ? afterHeader.slice(0, nextSectionMatch.index)
-          : afterHeader;
-        const newSection = `${hdr}${section.content.replace(/\n$/, "")}`;
-        existing = existing.replace(
-          `${hdr}${existingContent}`,
-          newSection,
-        );
-        manifestUpdated = true;
+        // Section exists → add missing commented-out lines from template
+        const templateLines = section.content.split("\n");
+        const linesToAdd: string[] = [];
+        for (const line of templateLines) {
+          const trimmed = line.trimEnd();
+          const keyMatch = trimmed.match(/^#?\s*([a-zA-Z_]\w*)\s*:/);
+          if (!keyMatch) continue;
+          const key = keyMatch[1];
+          if (!/^require_/.test(key) && !/^auto_load_/.test(key) && !/^inject_/.test(key)) continue;
+          if (!new RegExp(`\\b${key}\\s*:`, "m").test(existing)) {
+            linesToAdd.push(line);
+          }
+        }
+        if (linesToAdd.length > 0) {
+          const hdr = existing.match(headerRegex)?.[0] ?? "";
+          const idx = existing.indexOf(hdr);
+          const afterHdr = existing.slice(idx + hdr.length);
+          const nextHdr = afterHdr.match(/\n(?=# ── )/);
+          const secEnd = nextHdr ? idx + hdr.length + (nextHdr.index ?? 0) : existing.length;
+          existing =
+            existing.slice(0, secEnd) + "\n" + linesToAdd.join("\n") + "\n" + existing.slice(secEnd);
+          manifestUpdated = true;
+        }
       }
     }
 
